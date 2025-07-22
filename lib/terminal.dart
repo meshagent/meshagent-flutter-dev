@@ -1,0 +1,114 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:meshagent/meshagent.dart';
+import 'package:xterm/xterm.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+
+class RoomTerminal extends StatefulWidget {
+  const RoomTerminal({super.key, required this.client});
+
+  final RoomClient client;
+
+  @override
+  State createState() => _RoomTerminal();
+}
+
+class _RoomTerminal extends State<RoomTerminal> {
+  @override
+  void initState() {
+    super.initState();
+    terminal = Terminal(
+      onOutput: (data) {
+        websocket.sink.add(Uint8List.fromList([0, ...utf8.encode(data)]));
+      },
+      onResize: onResize,
+    );
+
+    final protocol = widget.client.protocol.channel as WebSocketProtocolChannel;
+    final url = protocol.url;
+    final jwt = protocol.jwt;
+
+    final execUrl = url.replace(path: "${url.path}/exec", queryParameters: {"token": jwt, "tty": "true", "room_storage_path": "/data"});
+
+    websocket = WebSocketChannel.connect(execUrl);
+    websocket.sink.done.then((_) {
+      if (mounted) {
+        setState(() {
+          closed = true;
+        });
+      }
+    });
+    watch(websocket);
+  }
+
+  bool connecting = true;
+  bool closed = false;
+
+  @override
+  void dispose() {
+    super.dispose();
+    sub.cancel();
+    websocket.sink.close();
+  }
+
+  void watch(WebSocketChannel websocket) {
+    sub = websocket.stream.listen(onData);
+  }
+
+  void onData(data) {
+    if (mounted) {
+      setState(() {
+        connecting = false;
+      });
+    }
+    if (data is Uint8List) {
+      final text = utf8.decode(Uint8List.sublistView(data, 1));
+      terminal.write(text);
+    }
+  }
+
+  late final StreamSubscription sub;
+  late final WebSocketChannel websocket;
+
+  late final Terminal terminal;
+
+  void onResize(int width, int height, _, __) {
+    final data = utf8.encode(jsonEncode({"Height": height, "Width": width}));
+    websocket.sink.add(Uint8List.fromList([4, ...data]));
+  }
+
+  int width = 0;
+  int height = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    if (closed) {
+      return Center(child: Text("Terminal Session Ended"));
+    }
+    if (connecting) {
+      return Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(width: 16, height: 16, child: CircularProgressIndicator()),
+            SizedBox(width: 10),
+            Text("Terminal Session Connecting..."),
+          ],
+        ),
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return TerminalView(
+          terminal,
+          textStyle: TerminalStyle(fontFamily: GoogleFonts.sourceCodePro(fontWeight: FontWeight.w500).fontFamily!, fontSize: 15),
+          padding: EdgeInsets.all(16),
+        );
+      },
+    );
+  }
+}
