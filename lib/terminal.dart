@@ -32,7 +32,14 @@ class _RoomTerminal extends State<RoomTerminal> {
     final url = protocol.url;
     final jwt = protocol.jwt;
 
-    final execUrl = url.replace(path: "${url.path}/exec", queryParameters: {"token": jwt, "tty": "true", "room_storage_path": "/data"});
+    final execUrl = url.replace(
+      path: "${url.path}/exec",
+      queryParameters: {
+        "token": jwt,
+        "tty": "true",
+        "room_storage_path": "/data",
+      },
+    );
 
     websocket = WebSocketChannel.connect(execUrl);
     websocket.sink.done.then((_) {
@@ -105,7 +112,13 @@ class _RoomTerminal extends State<RoomTerminal> {
       builder: (context, constraints) {
         return TerminalView(
           terminal,
-          textStyle: TerminalStyle(fontFamily: GoogleFonts.sourceCodePro(fontWeight: FontWeight.w500).fontFamily!, fontSize: 15),
+          textStyle: TerminalStyle(
+            fontFamily:
+                GoogleFonts.sourceCodePro(
+                  fontWeight: FontWeight.w500,
+                ).fontFamily!,
+            fontSize: 15,
+          ),
           padding: EdgeInsets.all(16),
         );
       },
