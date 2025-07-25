@@ -9,7 +9,7 @@ import 'dart:convert';
 
 import 'package:meshagent/room_server_client.dart';
 import 'package:meshagent_flutter_shadcn/meshagent_flutter_shadcn.dart';
-import 'package:meshagent_studio/ansi/ansi.dart';
+import './ansi.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
