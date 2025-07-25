@@ -24,10 +24,19 @@ TextSpan ansiToTextSpan(String source, {TextStyle? baseStyle}) {
 
   for (final m in sgr.allMatches(source)) {
     if (m.start > last) {
-      spans.add(TextSpan(text: source.substring(last, m.start), style: current));
+      spans.add(
+        TextSpan(text: source.substring(last, m.start), style: current),
+      );
     }
 
-    final params = m[2]!.isEmpty ? <int>[0] : m[2]!.split(';').where((s) => s.isNotEmpty).map(int.parse).toList();
+    final params =
+        m[2]!.isEmpty
+            ? <int>[0]
+            : m[2]!
+                .split(';')
+                .where((s) => s.isNotEmpty)
+                .map(int.parse)
+                .toList();
     _applySgr(params, (t) => current = t(current)); // mutates `current`
 
     last = m.end;
@@ -75,7 +84,9 @@ void _applySgr(List<int> p, void Function(TextStyle Function(TextStyle)) set) {
         set((s) => s.merge(const TextStyle(fontStyle: FontStyle.italic)));
         break;
       case 4:
-        set((s) => s.merge(const TextStyle(decoration: TextDecoration.underline)));
+        set(
+          (s) => s.merge(const TextStyle(decoration: TextDecoration.underline)),
+        );
         break;
       case 22:
         set((s) => s.merge(const TextStyle(fontWeight: FontWeight.normal)));
@@ -97,10 +108,16 @@ void _applySgr(List<int> p, void Function(TextStyle Function(TextStyle)) set) {
 
       // ----- 16‑colour background -----
       case >= 40 && <= 47:
-        set((s) => s.merge(TextStyle(backgroundColor: _ansi16Color(v - 40, false))));
+        set(
+          (s) =>
+              s.merge(TextStyle(backgroundColor: _ansi16Color(v - 40, false))),
+        );
         break;
       case >= 100 && <= 107:
-        set((s) => s.merge(TextStyle(backgroundColor: _ansi16Color(v - 100, true))));
+        set(
+          (s) =>
+              s.merge(TextStyle(backgroundColor: _ansi16Color(v - 100, true))),
+        );
         break;
 
       // ----- 256 / true‑colour foreground -----
@@ -110,7 +127,13 @@ void _applySgr(List<int> p, void Function(TextStyle Function(TextStyle)) set) {
             set((s) => s.merge(TextStyle(color: _ansi256Color(p[i + 2]))));
             i += 2;
           } else if (p[i + 1] == 2 && i + 4 < p.length) {
-            set((s) => s.merge(TextStyle(color: Color.fromARGB(0xFF, p[i + 2], p[i + 3], p[i + 4]))));
+            set(
+              (s) => s.merge(
+                TextStyle(
+                  color: Color.fromARGB(0xFF, p[i + 2], p[i + 3], p[i + 4]),
+                ),
+              ),
+            );
             i += 4;
           }
         }
@@ -120,10 +143,24 @@ void _applySgr(List<int> p, void Function(TextStyle Function(TextStyle)) set) {
       case 48:
         if (i + 1 < p.length) {
           if (p[i + 1] == 5 && i + 2 < p.length) {
-            set((s) => s.merge(TextStyle(backgroundColor: _ansi256Color(p[i + 2]))));
+            set(
+              (s) =>
+                  s.merge(TextStyle(backgroundColor: _ansi256Color(p[i + 2]))),
+            );
             i += 2;
           } else if (p[i + 1] == 2 && i + 4 < p.length) {
-            set((s) => s.merge(TextStyle(backgroundColor: Color.fromARGB(0xFF, p[i + 2], p[i + 3], p[i + 4]))));
+            set(
+              (s) => s.merge(
+                TextStyle(
+                  backgroundColor: Color.fromARGB(
+                    0xFF,
+                    p[i + 2],
+                    p[i + 3],
+                    p[i + 4],
+                  ),
+                ),
+              ),
+            );
             i += 4;
           }
         }
