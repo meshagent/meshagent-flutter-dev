@@ -38,6 +38,7 @@ dependencies:
   google_fonts: ^6.2.1
   meshagent: ^0.5.1
   meshagent_flutter: ^0.5.1
+  super_sliver_list: ^0.4.1
   xterm: ^4.0.0
 
 dev_dependencies:
