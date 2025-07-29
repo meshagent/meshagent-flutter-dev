@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:meshagent/meshagent.dart';
+import 'package:meshagent_flutter_dev/accounts_client.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
@@ -91,19 +92,36 @@ class _ImageTableState extends State<ImageTable> {
                             if (img.manifest != null) {
                               vars = await showShadDialog(
                                 context: context,
-                                builder: (context) => ConfigureServiceTemplateDialog(spec: img.manifest!),
+                                builder:
+                                    (context) => ConfigureServiceTemplateDialog(
+                                      spec: img.manifest!,
+                                    ),
                               );
 
                               if (vars == null) {
                                 return;
                               }
                             }
-                            widget.client.containers.run(image: img.tags.isNotEmpty ? img.tags.first : img.id, variables: vars);
+                            widget.client.containers.run(
+                              image:
+                                  img.tags.isNotEmpty ? img.tags.first : img.id,
+                              variables: vars,
+                            );
 
-                            ShadToaster.of(context).show(const ShadToast(description: Text('Starting container')));
+                            ShadToaster.of(context).show(
+                              const ShadToast(
+                                description: Text('Starting container'),
+                              ),
+                            );
                             _reload();
                           } catch (e) {
-                            ShadToaster.of(context).show(ShadToast(description: Text('Unable to start container: $e')));
+                            ShadToaster.of(context).show(
+                              ShadToast(
+                                description: Text(
+                                  'Unable to start container: $e',
+                                ),
+                              ),
+                            );
                           }
                         },
                       ),
@@ -111,18 +129,31 @@ class _ImageTableState extends State<ImageTable> {
                     DataCell(
                       Row(
                         children: [
-                          img.manifest != null ? Icon(LucideIcons.bot, color: Colors.green) : Icon(LucideIcons.disc),
+                          img.manifest != null
+                              ? Icon(LucideIcons.bot, color: Colors.green)
+                              : Icon(LucideIcons.disc),
                           SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              img.tags.isNotEmpty ? img.tags.first : '(untagged)',
-                              style: TextStyle(color: img.manifest != null ? Colors.green : null),
+                              img.tags.isNotEmpty
+                                  ? img.tags.first
+                                  : '(untagged)',
+                              style: TextStyle(
+                                color:
+                                    img.manifest != null ? Colors.green : null,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    DataCell(Text(img.size != null ? (img.size! / (1024 * 1024)).toStringAsFixed(1) : '‑')),
+                    DataCell(
+                      Text(
+                        img.size != null
+                            ? (img.size! / (1024 * 1024)).toStringAsFixed(1)
+                            : '‑',
+                      ),
+                    ),
 
                     DataCell(
                       IconButton(
@@ -135,10 +166,22 @@ class _ImageTableState extends State<ImageTable> {
                                 builder:
                                     (ctx) => AlertDialog(
                                       title: const Text('Delete image?'),
-                                      content: Text(img.tags.isNotEmpty ? img.tags.first : img.id),
+                                      content: Text(
+                                        img.tags.isNotEmpty
+                                            ? img.tags.first
+                                            : img.id,
+                                      ),
                                       actions: [
-                                        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                                        TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+                                        TextButton(
+                                          onPressed:
+                                              () => Navigator.pop(ctx, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed:
+                                              () => Navigator.pop(ctx, true),
+                                          child: const Text('Delete'),
+                                        ),
                                       ],
                                     ),
                               ) ??
@@ -146,11 +189,20 @@ class _ImageTableState extends State<ImageTable> {
                           if (!confirm) return;
 
                           try {
-                            await widget.client.containers.deleteImage(image: img.tags.isNotEmpty ? img.tags.first : img.id);
-                            ShadToaster.of(context).show(const ShadToast(description: Text('Deleted image')));
+                            await widget.client.containers.deleteImage(
+                              image:
+                                  img.tags.isNotEmpty ? img.tags.first : img.id,
+                            );
+                            ShadToaster.of(context).show(
+                              const ShadToast(
+                                description: Text('Deleted image'),
+                              ),
+                            );
                             _reload();
                           } catch (e) {
-                            ShadToaster.of(context).show(ShadToast(description: Text('Delete failed: $e')));
+                            ShadToaster.of(context).show(
+                              ShadToast(description: Text('Delete failed: $e')),
+                            );
                           }
                         },
                       ),
@@ -238,7 +290,14 @@ class _ContainerTableState extends State<ContainerTable> {
               for (final c in containers)
                 DataRow(
                   cells: [
-                    DataCell(Text(((c.entrypoint != null) ? [...c.entrypoint!, ...c.command] : [c.image]).join(' '))),
+                    DataCell(
+                      Text(
+                        ((c.entrypoint != null)
+                                ? [...c.entrypoint!, ...c.command]
+                                : [c.image])
+                            .join(' '),
+                      ),
+                    ),
                     DataCell(Text(c.startedBy.name)),
                     DataCell(
                       Row(
@@ -252,9 +311,17 @@ class _ContainerTableState extends State<ContainerTable> {
                                 context: context,
                                 builder:
                                     (context) => ShadDialog(
-                                      constraints: BoxConstraints(minWidth: 1024, minHeight: 600, maxHeight: 700, maxWidth: 1024),
+                                      constraints: BoxConstraints(
+                                        minWidth: 1024,
+                                        minHeight: 600,
+                                        maxHeight: 700,
+                                        maxWidth: 1024,
+                                      ),
                                       title: Text("Container logs"),
-                                      child: ContainerLogs(client: widget.client, containerId: c.id),
+                                      child: ContainerLogs(
+                                        client: widget.client,
+                                        containerId: c.id,
+                                      ),
                                     ),
                               );
                             },
@@ -269,10 +336,22 @@ class _ContainerTableState extends State<ContainerTable> {
                                     builder:
                                         (ctx) => AlertDialog(
                                           title: const Text('Stop container?'),
-                                          content: Text('Container ${c.id.substring(0, 12)}'),
+                                          content: Text(
+                                            'Container ${c.id.substring(0, 12)}',
+                                          ),
                                           actions: [
-                                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                                            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Stop')),
+                                            TextButton(
+                                              onPressed:
+                                                  () =>
+                                                      Navigator.pop(ctx, false),
+                                              child: const Text('Cancel'),
+                                            ),
+                                            TextButton(
+                                              onPressed:
+                                                  () =>
+                                                      Navigator.pop(ctx, true),
+                                              child: const Text('Stop'),
+                                            ),
                                           ],
                                         ),
                                   ) ??
@@ -280,11 +359,21 @@ class _ContainerTableState extends State<ContainerTable> {
                               if (!confirm) return;
 
                               try {
-                                await widget.client.containers.stop(containerId: c.id);
-                                ShadToaster.of(context).show(const ShadToast(description: Text('Container stopped')));
+                                await widget.client.containers.stop(
+                                  containerId: c.id,
+                                );
+                                ShadToaster.of(context).show(
+                                  const ShadToast(
+                                    description: Text('Container stopped'),
+                                  ),
+                                );
                                 _reload();
                               } catch (e) {
-                                ShadToaster.of(context).show(ShadToast(description: Text('Stop failed: $e')));
+                                ShadToaster.of(context).show(
+                                  ShadToast(
+                                    description: Text('Stop failed: $e'),
+                                  ),
+                                );
                               }
                             },
                           ),
@@ -377,7 +466,13 @@ class _BuildTableState extends State<BuildTable> {
                   cells: [
                     DataCell(Text(b.tag)),
                     DataCell(Text(b.status)),
-                    DataCell(Text(b.error ?? (b.result != null ? b.result.toString() : '—'), overflow: TextOverflow.ellipsis)),
+                    DataCell(
+                      Text(
+                        b.error ??
+                            (b.result != null ? b.result.toString() : '—'),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                     DataCell(
                       b.status == 'running'
                           ? IconButton(
@@ -389,11 +484,23 @@ class _BuildTableState extends State<BuildTable> {
                                     context: context,
                                     builder:
                                         (ctx) => AlertDialog(
-                                          title: const Text('Cancel this build?'),
+                                          title: const Text(
+                                            'Cancel this build?',
+                                          ),
                                           content: Text(b.tag),
                                           actions: [
-                                            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
-                                            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Yes')),
+                                            TextButton(
+                                              onPressed:
+                                                  () =>
+                                                      Navigator.pop(ctx, false),
+                                              child: const Text('No'),
+                                            ),
+                                            TextButton(
+                                              onPressed:
+                                                  () =>
+                                                      Navigator.pop(ctx, true),
+                                              child: const Text('Yes'),
+                                            ),
                                           ],
                                         ),
                                   ) ??
@@ -401,11 +508,21 @@ class _BuildTableState extends State<BuildTable> {
                               if (!confirm) return;
 
                               try {
-                                await widget.client.containers.stopBuild(requestId: b.requestId);
-                                ShadToaster.of(context).show(const ShadToast(description: Text('Build cancelled')));
+                                await widget.client.containers.stopBuild(
+                                  requestId: b.requestId,
+                                );
+                                ShadToaster.of(context).show(
+                                  const ShadToast(
+                                    description: Text('Build cancelled'),
+                                  ),
+                                );
                                 _reload();
                               } catch (e) {
-                                ShadToaster.of(context).show(ShadToast(description: Text('Cancel failed: $e')));
+                                ShadToaster.of(context).show(
+                                  ShadToast(
+                                    description: Text('Cancel failed: $e'),
+                                  ),
+                                );
                               }
                             },
                           )
@@ -431,7 +548,8 @@ class ConfigureServiceTemplateDialog extends StatefulWidget {
   State createState() => _ConfigureServiceTemplateDialog();
 }
 
-class _ConfigureServiceTemplateDialog extends State<ConfigureServiceTemplateDialog> {
+class _ConfigureServiceTemplateDialog
+    extends State<ConfigureServiceTemplateDialog> {
   final _formKey = GlobalKey<FormState>();
   late final Map<String, String> _vars; // {varName: value}
 
@@ -439,7 +557,10 @@ class _ConfigureServiceTemplateDialog extends State<ConfigureServiceTemplateDial
   void initState() {
     super.initState();
     // Initialise every variable with an empty string
-    _vars = {for (final v in widget.spec.variables ?? <ServiceTemplateVariable>[]) v.name: ''};
+    _vars = {
+      for (final v in widget.spec.variables ?? <ServiceTemplateVariable>[])
+        v.name: '',
+    };
   }
 
   /// Replace `${VAR}` or `{{VAR}}` tokens in [spec.command] with current values.
@@ -469,12 +590,19 @@ class _ConfigureServiceTemplateDialog extends State<ConfigureServiceTemplateDial
           shrinkWrap: true,
           children: [
             const SizedBox(height: 16),
-            Text(widget.spec.name, style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              widget.spec.name,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 4),
             if (widget.spec.description != null) Text(widget.spec.description!),
             const SizedBox(height: 16),
             // ── Variable inputs ─────────────────────────────────────────────
-            if (hasVars) Text("Required variables", style: Theme.of(context).textTheme.titleMedium),
+            if (hasVars)
+              Text(
+                "Required variables",
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
             const SizedBox(height: 4),
             ...widget.spec.variables!.map(
               (v) => Padding(
@@ -484,20 +612,46 @@ class _ConfigureServiceTemplateDialog extends State<ConfigureServiceTemplateDial
                         ? ShadInputFormField(
                           label: Text(v.name),
                           obscureText: v.obscure,
-                          description: v.description == null ? null : Text(v.description ?? ''),
+                          description:
+                              v.description == null
+                                  ? null
+                                  : Text(v.description ?? ''),
 
-                          validator: v.optional ? null : (txt) => (txt.trim().isEmpty) ? '${v.name} is required' : null,
-                          onChanged: (txt) => setState(() => _vars[v.name] = txt),
+                          validator:
+                              v.optional
+                                  ? null
+                                  : (txt) =>
+                                      (txt.trim().isEmpty)
+                                          ? '${v.name} is required'
+                                          : null,
+                          onChanged:
+                              (txt) => setState(() => _vars[v.name] = txt),
                         )
                         : ShadSelectFormField<String>(
                           label: Text(v.name),
                           initialValue: v.enumValues![0],
-                          selectedOptionBuilder: (context, value) => Text(value),
-                          options: [...v.enumValues!.map((v) => ShadOption<String>(value: v, child: Text(v)))],
-                          description: v.description == null ? null : Text(v.description ?? ''),
+                          selectedOptionBuilder:
+                              (context, value) => Text(value),
+                          options: [
+                            ...v.enumValues!.map(
+                              (v) =>
+                                  ShadOption<String>(value: v, child: Text(v)),
+                            ),
+                          ],
+                          description:
+                              v.description == null
+                                  ? null
+                                  : Text(v.description ?? ''),
                           validator:
-                              v.optional ? null : (txt) => (txt?.trim().isEmpty == true || txt == null) ? '${v.name} is required' : null,
-                          onChanged: (txt) => setState(() => _vars[v.name] = txt!),
+                              v.optional
+                                  ? null
+                                  : (txt) =>
+                                      (txt?.trim().isEmpty == true ||
+                                              txt == null)
+                                          ? '${v.name} is required'
+                                          : null,
+                          onChanged:
+                              (txt) => setState(() => _vars[v.name] = txt!),
                         ),
               ),
             ),
@@ -505,13 +659,23 @@ class _ConfigureServiceTemplateDialog extends State<ConfigureServiceTemplateDial
             // ── Command preview ─────────────────────────────────────────────
             if (widget.spec.command != null) ...[
               const SizedBox(height: 16),
-              Text('Command to execute', style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                'Command to execute',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: 4),
-              Text(_renderCommand().isEmpty ? '— complete the variables above —' : _renderCommand()),
+              Text(
+                _renderCommand().isEmpty
+                    ? '— complete the variables above —'
+                    : _renderCommand(),
+              ),
             ],
 
             const SizedBox(height: 16),
-            Text('Room storage', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'Room storage',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 4),
             if (widget.spec.roomStoragePath == null) Text("No storage mount"),
 
@@ -535,11 +699,16 @@ class _ConfigureServiceTemplateDialog extends State<ConfigureServiceTemplateDial
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Port ${p.num.value ?? "auto assigned"} ${p.type ?? ""}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                      Text(
+                        'Port ${p.num.value ?? "auto assigned"} ${p.type ?? ""}',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
                       ...p.endpoints.map(
                         (e) => Padding(
                           padding: const EdgeInsets.only(top: 4),
-                          child: Text('• ${e.path}  →  ${e.identity}  (${e.type ?? "unspecified"})'),
+                          child: Text(
+                            '• ${e.path}  →  ${e.identity}  (${e.type ?? "unspecified"})',
+                          ),
                         ),
                       ),
                     ],
@@ -647,13 +816,19 @@ class _ContainerLogStream extends State<ContainerLogStream> {
         if (progress != null) ...[
           Text(progress!.message),
           if (progress!.current != null && progress!.total != null)
-            LinearProgressIndicator(value: progress!.current!.toDouble() / progress!.total!.toDouble()),
+            LinearProgressIndicator(
+              value:
+                  progress!.current!.toDouble() / progress!.total!.toDouble(),
+            ),
         ],
         Expanded(
           child: SelectionArea(
             child: Container(
               clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), color: ShadTheme.of(context).colorScheme.secondary),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(5),
+                color: ShadTheme.of(context).colorScheme.secondary,
+              ),
               child: SuperListView(
                 controller: controller,
                 padding: EdgeInsets.all(24),
@@ -678,7 +853,11 @@ class _ContainerLogStream extends State<ContainerLogStream> {
 }
 
 class ContainerLogs extends StatefulWidget {
-  const ContainerLogs({super.key, required this.client, required this.containerId});
+  const ContainerLogs({
+    super.key,
+    required this.client,
+    required this.containerId,
+  });
 
   final RoomClient client;
   final String containerId;
@@ -690,7 +869,10 @@ class _ContainerLogsState extends State<ContainerLogs> {
   @override
   void initState() {
     super.initState();
-    logs = widget.client.containers.logs(containerId: widget.containerId, follow: true);
+    logs = widget.client.containers.logs(
+      containerId: widget.containerId,
+      follow: true,
+    );
   }
 
   @override
@@ -704,5 +886,637 @@ class _ContainerLogsState extends State<ContainerLogs> {
   @override
   Widget build(BuildContext context) {
     return ContainerLogStream(logs: logs);
+  }
+}
+
+class BuildImage extends StatefulWidget {
+  const BuildImage({
+    super.key,
+    required this.room,
+    required this.projectId,
+    required this.accounts,
+  });
+
+  final AccountsClient accounts;
+  final RoomClient room;
+  final String projectId;
+
+  @override
+  State<BuildImage> createState() => _BuildImage();
+}
+
+class _BuildImage extends State<BuildImage> {
+  List<DockerSecret> currentCredentials = [];
+  LogStream? logs;
+
+  Future<bool> buildImage() async {
+    if (!formKey.currentState!.validate()) {
+      return false;
+    }
+
+    BuildSource? source;
+
+    setState(() {
+      error = null;
+    });
+
+    final gitUrl = formKey.currentState!.value["git_url"] as String?;
+    if (gitUrl != null && gitUrl.isNotEmpty) {
+      String gitPassword = formKey.currentState!.value["git_password"];
+      String gitUsername = formKey.currentState!.value["git_username"];
+
+      source = BuildSourceGit(
+        url: "https://$gitUrl",
+        username: gitUsername == "" ? null : gitUsername,
+        password: gitPassword == "" ? null : gitPassword,
+      );
+    }
+
+    /*
+    Stream<TarEntry> entries = Stream.value(
+      TarEntry.data(
+        TarHeader(name: 'Dockerfile', mode: int.parse('644', radix: 8)),
+        utf8.encode("""FROM python:3.13-slim-bookworm
+        ENV VIRTUAL_ENV=/src/venv
+        RUN python3 -m venv \$VIRTUAL_ENV
+        ENV PATH="\$VIRTUAL_ENV/bin:\$PATH"
+
+        RUN pip3 install meshagent[all]
+
+        ENTRYPOINT [ "meshagent", "chatbot", "join" ]
+        """),
+      ),
+    );
+
+    final builder = BytesBuilder(copy: false);
+    await for (final entry in entries.transform(tarWriter)) {
+      builder.add(entry);
+    }
+    final data = Uint8List.fromList(await GZip().compress(builder.takeBytes()));
+
+        final file = await widget.room.storage.open("docker.tar.gz", overwrite: true);
+    await widget.room.storage.write(file, data);
+    await widget.room.storage.close(file);
+
+*/
+    final image = formKey.currentState!.value["git_url"];
+
+    try {
+      if (source != null) {
+        // final buildLogs = widget.room.containers.build(tag: image, source: BuildSourceContext(context: Uint8List.fromList(data)));
+        //final buildLogs = widget.room.containers.build(tag: image, source: BuildSourceRoom(path: "/sample"));
+        final buildLogs = widget.room.containers.build(
+          tag: image,
+          source: source,
+          credentials: currentCredentials,
+        );
+        if (!mounted) return false;
+        setState(() {
+          logs = buildLogs;
+        });
+
+        await buildLogs.result;
+      }
+      return true;
+    } catch (ex) {
+      if (mounted) {
+        setState(() {
+          error = ex;
+        });
+      }
+      return false;
+    }
+  }
+
+  Object? error;
+
+  bool building = false;
+  var formKey = GlobalKey<ShadFormState>();
+
+  Future<List<Map<String, dynamic>>>? pullSecrets;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ShadDialog(
+      constraints: BoxConstraints.tight(Size(1000, 750)),
+      title: Text("Build an Image"),
+      description: Text("Build an image to use for containers in your room"),
+
+      actions: [
+        SizedBox(
+          width: 20,
+          height: 20,
+          child: building ? CircularProgressIndicator() : null,
+        ),
+        SizedBox(width: 10),
+        if (error == null && logs == null)
+          ShadButton(
+            enabled: !building,
+            onPressed: () async {
+              setState(() {
+                building = true;
+              });
+              try {
+                if (await buildImage()) {
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                }
+              } finally {
+                if (mounted) {
+                  setState(() {
+                    building = false;
+                  });
+                }
+              }
+            },
+            child: Text("Build Image"),
+          ),
+      ],
+      child: SizedBox(
+        width: 1000,
+        height: 650,
+        child:
+            error != null
+                ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "$error",
+                        style: TextStyle(
+                          color: ShadTheme.of(context).colorScheme.destructive,
+                        ),
+                      ),
+                      ShadButton(
+                        onPressed: () {
+                          setState(() {
+                            error = null;
+                            logs = null;
+                          });
+                        },
+                        child: Text("Back"),
+                      ),
+                    ],
+                  ),
+                )
+                : logs != null
+                ? ContainerLogStream(logs: logs!)
+                : Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(left: 16, top: 16),
+                        child: ShadForm(
+                          key: formKey,
+                          child: Container(
+                            child: Padding(
+                              padding: EdgeInsets.only(top: 16),
+                              child: SingleChildScrollView(
+                                padding: EdgeInsets.only(
+                                  left: 4,
+                                  right: 16,
+                                  bottom: 48,
+                                ),
+                                child: Column(
+                                  spacing: 16,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    ShadInputFormField(
+                                      id: "git_url",
+                                      leading: Text("https://"),
+                                      gap: 0,
+                                      label: Text("git url"),
+                                      initialValue: "",
+                                      validator:
+                                          (value) =>
+                                              value.isEmpty
+                                                  ? "git url is required"
+                                                  : null,
+                                    ),
+
+                                    ShadInputFormField(
+                                      id: "git_username",
+                                      label: Text("git username"),
+                                      initialValue: "",
+                                    ),
+
+                                    ShadInputFormField(
+                                      id: "git_password",
+                                      label: Text("git password"),
+                                      obscureText: true,
+                                      initialValue: "",
+                                    ),
+
+                                    Text(
+                                      "registry credentials",
+                                      style:
+                                          ShadTheme.of(context).textTheme.small,
+                                    ),
+                                    DockerSecretsEditor(
+                                      initialSecrets: [],
+                                      onChanged: (c) {
+                                        currentCredentials = c;
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+      ),
+    );
+  }
+}
+
+class PullImage extends StatefulWidget {
+  const PullImage({
+    super.key,
+    required this.room,
+    required this.projectId,
+    required this.accounts,
+  });
+
+  final AccountsClient accounts;
+  final RoomClient room;
+  final String projectId;
+
+  @override
+  State<PullImage> createState() => _PullImage();
+}
+
+class _PullImage extends State<PullImage> {
+  List<DockerSecret> currentCredentials = [];
+  LogStream? logs;
+
+  Future<bool> pullImage() async {
+    if (!formKey.currentState!.validate()) {
+      return false;
+    }
+    setState(() {
+      error = null;
+    });
+
+    final tag = formKey.currentState!.value["tag"] as String;
+
+    try {
+      // final buildLogs = widget.room.containers.build(tag: image, source: BuildSourceContext(context: Uint8List.fromList(data)));
+      //final buildLogs = widget.room.containers.build(tag: image, source: BuildSourceRoom(path: "/sample"));
+      final buildLogs = widget.room.containers.pullImage(
+        tag: tag,
+        credentials: currentCredentials,
+      );
+      if (!mounted) return false;
+      setState(() {
+        logs = buildLogs;
+      });
+
+      await buildLogs.result;
+      return true;
+    } catch (ex) {
+      if (mounted) {
+        setState(() {
+          error = ex;
+        });
+      }
+      return false;
+    }
+  }
+
+  Object? error;
+
+  bool building = false;
+  var formKey = GlobalKey<ShadFormState>();
+
+  Future<List<Map<String, dynamic>>>? pullSecrets;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ShadDialog(
+      constraints: BoxConstraints.tight(Size(1000, 750)),
+      title: Text("Pull an Image"),
+      description: Text(
+        "Pull an image from a docker repository to use for containers in your room",
+      ),
+
+      actions: [
+        SizedBox(
+          width: 20,
+          height: 20,
+          child: building ? CircularProgressIndicator() : null,
+        ),
+        SizedBox(width: 10),
+        if (error == null && logs == null)
+          ShadButton(
+            enabled: !building,
+            onPressed: () async {
+              setState(() {
+                building = true;
+              });
+              try {
+                if (await pullImage()) {
+                  if (context.mounted) {
+                    Navigator.of(context).pop();
+                  }
+                }
+              } finally {
+                if (mounted) {
+                  setState(() {
+                    building = false;
+                  });
+                }
+              }
+            },
+            child: Text("Pull Image"),
+          ),
+      ],
+      child: SizedBox(
+        width: 1000,
+        height: 650,
+        child:
+            error != null
+                ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "$error",
+                        style: TextStyle(
+                          color: ShadTheme.of(context).colorScheme.destructive,
+                        ),
+                      ),
+                      ShadButton(
+                        onPressed: () {
+                          setState(() {
+                            error = null;
+                            logs = null;
+                          });
+                        },
+                        child: Text("Back"),
+                      ),
+                    ],
+                  ),
+                )
+                : logs != null
+                ? ContainerLogStream(logs: logs!)
+                : Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(left: 16, top: 16),
+                        child: ShadForm(
+                          key: formKey,
+                          child: Container(
+                            child: Padding(
+                              padding: EdgeInsets.only(top: 16),
+                              child: SingleChildScrollView(
+                                padding: EdgeInsets.only(
+                                  left: 4,
+                                  right: 16,
+                                  bottom: 48,
+                                ),
+                                child: Column(
+                                  spacing: 16,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    ShadInputFormField(
+                                      id: "tag",
+                                      label: Text("image tag"),
+                                      initialValue: "",
+                                      validator:
+                                          (value) =>
+                                              value.isEmpty
+                                                  ? "image tag is required"
+                                                  : null,
+                                    ),
+
+                                    Text(
+                                      "registry credentials",
+                                      style:
+                                          ShadTheme.of(context).textTheme.small,
+                                    ),
+                                    DockerSecretsEditor(
+                                      initialSecrets: [],
+                                      onChanged: (c) {
+                                        currentCredentials = c;
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+      ),
+    );
+  }
+}
+
+extension SecretCopy on DockerSecret {
+  DockerSecret copyWith({
+    String? username,
+    String? password,
+    String? registry,
+    String? email,
+  }) => DockerSecret(
+    username: username ?? this.username,
+    password: password ?? this.password,
+    registry: registry ?? this.registry,
+    email: email ?? this.email,
+  );
+}
+
+class DockerSecretsEditor extends StatefulWidget {
+  const DockerSecretsEditor({
+    super.key,
+    required this.initialSecrets,
+    this.onChanged,
+  });
+
+  /// Existing secrets to edit
+  final List<DockerSecret> initialSecrets;
+
+  /// Notify parent when the list mutates
+  final ValueChanged<List<DockerSecret>>? onChanged;
+
+  @override
+  State<DockerSecretsEditor> createState() => _DockerSecretsEditorState();
+}
+
+class _DockerSecretsEditorState extends State<DockerSecretsEditor> {
+  late List<DockerSecret> _secrets;
+
+  @override
+  void initState() {
+    super.initState();
+    _secrets = [...widget.initialSecrets];
+  }
+
+  void _notify() => widget.onChanged?.call(List.unmodifiable(_secrets));
+
+  void _addEmpty() {
+    setState(() {
+      _secrets.add(
+        const DockerSecret(username: '', password: '', registry: '', email: ''),
+      );
+      _notify();
+    });
+  }
+
+  void _removeAt(int index) {
+    setState(() {
+      _secrets.removeAt(index);
+      _notify();
+    });
+  }
+
+  void _update(int index, DockerSecret updated) {
+    setState(() {
+      _secrets[index] = updated;
+      _notify();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // List of editable secrets
+        for (final (i, _) in _secrets.indexed)
+          _DockerSecretCard(
+            key: ValueKey(i),
+            secret: _secrets[i],
+            onChanged: (s) => _update(i, s),
+            onDelete: () => _removeAt(i),
+          ),
+        const SizedBox(height: 16),
+        // + Add button
+        ShadButton(onPressed: _addEmpty, child: const Text('Add credential')),
+      ],
+    );
+  }
+}
+
+/// ---------------------------------------------------------------------------
+/// Single‑secret card
+/// ---------------------------------------------------------------------------
+class _DockerSecretCard extends StatefulWidget {
+  const _DockerSecretCard({
+    super.key,
+    required this.secret,
+    required this.onChanged,
+    required this.onDelete,
+  });
+
+  final DockerSecret secret;
+  final ValueChanged<DockerSecret> onChanged;
+  final VoidCallback onDelete;
+
+  @override
+  State<_DockerSecretCard> createState() => _DockerSecretCardState();
+}
+
+class _DockerSecretCardState extends State<_DockerSecretCard> {
+  late TextEditingController _userCtl;
+  late TextEditingController _passCtl;
+  late TextEditingController _regCtl;
+  late TextEditingController _emailCtl;
+  bool _obscure = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _userCtl = TextEditingController(text: widget.secret.username);
+    _passCtl = TextEditingController(text: widget.secret.password);
+    _regCtl = TextEditingController(text: widget.secret.registry);
+    _emailCtl = TextEditingController(text: widget.secret.email);
+  }
+
+  void _emit() => widget.onChanged(
+    widget.secret.copyWith(
+      username: _userCtl.text,
+      password: _passCtl.text,
+      registry: _regCtl.text,
+      email: _emailCtl.text,
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          // Username
+          ShadInputFormField(
+            controller: _userCtl,
+            label: Text('Username'),
+            onChanged: (_) => _emit(),
+          ),
+          const SizedBox(height: 12),
+          // Password  +  reveal icon
+          ShadInputFormField(
+            controller: _passCtl,
+            label: Text('Password'),
+            obscureText: _obscure,
+            onChanged: (_) => _emit(),
+          ),
+          const SizedBox(height: 12),
+          // Registry
+          ShadInputFormField(
+            controller: _regCtl,
+            label: Text('Registry'),
+            onChanged: (_) => _emit(),
+          ),
+          const SizedBox(height: 12),
+          // E‑mail
+          ShadInputFormField(
+            controller: _emailCtl,
+            label: Text('E‑mail'),
+            onChanged: (_) => _emit(),
+          ),
+          const SizedBox(height: 16),
+          // Delete button
+          Align(
+            alignment: Alignment.centerRight,
+            child: ShadButton.outline(
+              onPressed: widget.onDelete,
+              leading: const Icon(Icons.delete_outline),
+              child: const Text('Remove'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _userCtl.dispose();
+    _passCtl.dispose();
+    _regCtl.dispose();
+    _emailCtl.dispose();
+    super.dispose();
   }
 }
