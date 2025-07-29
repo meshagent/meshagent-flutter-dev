@@ -4,7 +4,12 @@ import 'package:http/http.dart' as http;
 enum ProjectRole { member, admin }
 
 class Balance {
-  Balance({required this.balance, required this.autoRechargeAmount, required this.autoRechargeThreshhold, required this.lastRecharge});
+  Balance({
+    required this.balance,
+    required this.autoRechargeAmount,
+    required this.autoRechargeThreshhold,
+    required this.lastRecharge,
+  });
 
   final double balance;
   final double? autoRechargeThreshhold;
@@ -46,7 +51,10 @@ abstract class AccountsClient {
 
   /// Returns the default headers including Bearer Authorization.
   Map<String, String> _getHeaders() {
-    return {'Authorization': 'Bearer $token', 'Content-Type': 'application/json'};
+    return {
+      'Authorization': 'Bearer $token',
+      'Content-Type': 'application/json',
+    };
   }
 
   /// Corresponds to: POST /accounts/projects/{project_id}/secrets
@@ -61,7 +69,11 @@ abstract class AccountsClient {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/secrets');
     final body = {'name': name, 'type': type, 'data': data};
 
-    final response = await http.post(uri, headers: _getHeaders(), body: jsonEncode(body));
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(body),
+    );
 
     if (response.statusCode >= 400) {
       throw AccountsClientException(
@@ -91,7 +103,9 @@ abstract class AccountsClient {
   /// Corresponds to: GET /accounts/projects/{project_id}/secrets
   /// Returns JSON like { "secrets": [ { "id": ..., "name": ..., "type": ..., "data": ... } ] }.
   /// We’ll return the inner list as a List<Map<String, dynamic>>.
-  Future<List<Map<String, dynamic>>> listProjectSecrets(String projectId) async {
+  Future<List<Map<String, dynamic>>> listProjectSecrets(
+    String projectId,
+  ) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/secrets');
     final response = await http.get(uri, headers: _getHeaders());
 
@@ -107,10 +121,17 @@ abstract class AccountsClient {
     return secretsList.whereType<Map<String, dynamic>>().toList();
   }
 
-  Future<void> updateProjectSettings({required String projectId, required Map<String, dynamic> settings}) async {
+  Future<void> updateProjectSettings({
+    required String projectId,
+    required Map<String, dynamic> settings,
+  }) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/settings');
 
-    final response = await http.put(uri, headers: _getHeaders(), body: jsonEncode(settings));
+    final response = await http.put(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(settings),
+    );
 
     if (response.statusCode >= 400) {
       throw AccountsClientException(
@@ -130,10 +151,16 @@ abstract class AccountsClient {
     required String type,
     required Map<String, dynamic> data,
   }) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/secrets/$secretId');
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/secrets/$secretId',
+    );
     final body = {'name': name, 'type': type, 'data': data};
 
-    final response = await http.put(uri, headers: _getHeaders(), body: jsonEncode(body));
+    final response = await http.put(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(body),
+    );
 
     if (response.statusCode >= 400) {
       throw AccountsClientException(
@@ -147,8 +174,13 @@ abstract class AccountsClient {
 
   /// Corresponds to: DELETE /accounts/projects/{project_id}/secrets/{secret_id}
   /// Returns {} or 204 No Content on success.
-  Future<void> deleteProjectSecret({required String projectId, required String secretId}) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/secrets/$secretId');
+  Future<void> deleteProjectSecret({
+    required String projectId,
+    required String secretId,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/secrets/$secretId',
+    );
     final response = await http.delete(uri, headers: _getHeaders());
 
     if (response.statusCode >= 400) {
@@ -164,10 +196,17 @@ abstract class AccountsClient {
   /// Corresponds to: POST /accounts/projects/:project_id/services
   /// Body: { "name", "image", "pull_secret", "runtime_secrets", "environment_secrets", "environment" : \<settings\> }
   /// Returns JSON like { "id" } on success.
-  Future<Map<String, dynamic>> createService({required String projectId, required Map<String, dynamic> service}) async {
+  Future<Map<String, dynamic>> createService({
+    required String projectId,
+    required Map<String, dynamic> service,
+  }) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/services');
 
-    final response = await http.post(uri, headers: _getHeaders(), body: jsonEncode(service));
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(service),
+    );
 
     if (response.statusCode >= 400) {
       throw AccountsClientException(
@@ -187,9 +226,15 @@ abstract class AccountsClient {
     required String serviceId,
     required Map<String, dynamic> service,
   }) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/services/$serviceId');
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/services/$serviceId',
+    );
 
-    final response = await http.put(uri, headers: _getHeaders(), body: jsonEncode(service));
+    final response = await http.put(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(service),
+    );
 
     if (response.statusCode >= 400) {
       throw AccountsClientException(
@@ -203,8 +248,13 @@ abstract class AccountsClient {
 
   /// Corresponds to: GET /accounts/projects/{project_id}/services
   /// Returns a JSON dict like: { "tokens": [ { ... }, ... ] }.
-  Future<List<Map<String, dynamic>>> getProjectService({required String projectId, required String serviceId}) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/services/$serviceId');
+  Future<List<Map<String, dynamic>>> getProjectService({
+    required String projectId,
+    required String serviceId,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/services/$serviceId',
+    );
     final response = await http.get(uri, headers: _getHeaders());
 
     if (response.statusCode >= 400) {
@@ -218,7 +268,9 @@ abstract class AccountsClient {
 
   /// Corresponds to: GET /accounts/projects/{project_id}/services
   /// Returns a JSON dict like: { "tokens": [ { ... }, ... ] }.
-  Future<List<Map<String, dynamic>>> listProjectServices(String projectId) async {
+  Future<List<Map<String, dynamic>>> listProjectServices(
+    String projectId,
+  ) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/services');
     final response = await http.get(uri, headers: _getHeaders());
 
@@ -228,13 +280,20 @@ abstract class AccountsClient {
         'Status code: ${response.statusCode}, body: ${response.body}',
       );
     }
-    return (jsonDecode(response.body)["services"] as List).whereType<Map<String, dynamic>>().toList();
+    return (jsonDecode(response.body)["services"] as List)
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
   /// Corresponds to: DELETE /accounts/projects/{project_id}/services/{token_id}
   /// Returns 204 No Content on success (no JSON body).
-  Future<void> deleteProjectService({required String projectId, required String serviceId}) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/services/$serviceId');
+  Future<void> deleteProjectService({
+    required String projectId,
+    required String serviceId,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/services/$serviceId',
+    );
     final response = await http.delete(uri, headers: _getHeaders());
 
     if (response.statusCode >= 400) {
@@ -250,10 +309,17 @@ abstract class AccountsClient {
   /// Corresponds to: POST /accounts/projects/:project_id/shares
   /// Body: { "settings" : \<settings\> }
   /// Returns JSON like { "id" } on success.
-  Future<Map<String, dynamic>> createShare(String projectId, {Map<String, dynamic>? settings}) async {
+  Future<Map<String, dynamic>> createShare(
+    String projectId, {
+    Map<String, dynamic>? settings,
+  }) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/shares');
 
-    final response = await http.post(uri, headers: _getHeaders(), body: jsonEncode({'settings': settings ?? {}}));
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode({'settings': settings ?? {}}),
+    );
 
     if (response.statusCode >= 400) {
       throw AccountsClientException(
@@ -268,7 +334,9 @@ abstract class AccountsClient {
   /// Corresponds to: DELETE /accounts/projects/:project_id/shares/:share_id
   /// No JSON response on success.
   Future<void> deleteShare(String projectId, String shareId) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/shares/$shareId');
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/shares/$shareId',
+    );
 
     final response = await http.delete(uri, headers: _getHeaders());
     if (response.statusCode >= 400) {
@@ -283,10 +351,20 @@ abstract class AccountsClient {
   /// Corresponds to: PUT /accounts/projects/:project_id/shares/:share_id
   /// Body: { "settings": \<settings\> }
   /// No JSON response on success.
-  Future<void> updateShare(String projectId, String shareId, {Map<String, dynamic>? settings}) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/shares/$shareId');
+  Future<void> updateShare(
+    String projectId,
+    String shareId, {
+    Map<String, dynamic>? settings,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/shares/$shareId',
+    );
 
-    final response = await http.put(uri, headers: _getHeaders(), body: jsonEncode({'settings': settings ?? {}}));
+    final response = await http.put(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode({'settings': settings ?? {}}),
+    );
 
     if (response.statusCode >= 400) {
       throw AccountsClientException(
@@ -322,7 +400,11 @@ abstract class AccountsClient {
   Future<Map<String, dynamic>> connectShare(String shareId) async {
     final uri = Uri.parse('$baseUrl/shares/$shareId/connect');
 
-    final response = await http.post(uri, headers: _getHeaders(), body: jsonEncode({}));
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode({}),
+    );
 
     if (response.statusCode >= 400) {
       throw AccountsClientException(
@@ -339,10 +421,16 @@ abstract class AccountsClient {
   /// Returns JSON like { "id", "owner_user_id", "name" } on success.
   Future<Map<String, dynamic>> createProject(String name) async {
     final uri = Uri.parse('$baseUrl/accounts/projects');
-    final response = await http.post(uri, headers: _getHeaders(), body: jsonEncode({'name': name}));
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode({'name': name}),
+    );
 
     if (response.statusCode >= 400) {
-      throw AccountsClientException('Failed to create project. Status code: ${response.statusCode}, body: ${response.body}');
+      throw AccountsClientException(
+        'Failed to create project. Status code: ${response.statusCode}, body: ${response.body}',
+      );
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
@@ -357,21 +445,32 @@ abstract class AccountsClient {
     final response = await http.Response.fromStream(streamedResponse);
 
     if (response.statusCode >= 400) {
-      throw AccountsClientException('Failed to remove user from project. Status code: ${response.statusCode}, body: ${response.body}');
+      throw AccountsClientException(
+        'Failed to remove user from project. Status code: ${response.statusCode}, body: ${response.body}',
+      );
     }
   }
 
   /// Corresponds to: POST /accounts/projects/:project_id/users
   /// Body: { "project_id", "user_id" }
   /// Returns JSON like { "ok": true } on success.
-  Future<Map<String, dynamic>> addUserToProject(String projectId, String userId) async {
+  Future<Map<String, dynamic>> addUserToProject(
+    String projectId,
+    String userId,
+  ) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/users');
     final body = {'project_id': projectId, 'user_id': userId};
 
-    final response = await http.post(uri, headers: _getHeaders(), body: jsonEncode(body));
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(body),
+    );
 
     if (response.statusCode >= 400) {
-      throw AccountsClientException('Failed to add user to project. Status code: ${response.statusCode}, body: ${response.body}');
+      throw AccountsClientException(
+        'Failed to add user to project. Status code: ${response.statusCode}, body: ${response.body}',
+      );
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
@@ -394,8 +493,10 @@ abstract class AccountsClient {
     return Balance(
       balance: (data["balance"] as num).toDouble(),
       autoRechargeAmount: (data["auto_recharge_amount"] as num?)?.toDouble(),
-      autoRechargeThreshhold: (data["auto_recharge_threshold"] as num?)?.toDouble(),
-      lastRecharge: lastRechargeStr == null ? null : DateTime.parse(lastRechargeStr),
+      autoRechargeThreshhold:
+          (data["auto_recharge_threshold"] as num?)?.toDouble(),
+      lastRecharge:
+          lastRechargeStr == null ? null : DateTime.parse(lastRechargeStr),
     );
   }
 
@@ -433,37 +534,59 @@ abstract class AccountsClient {
     final resp = await http.post(
       uri,
       headers: _getHeaders(),
-      body: jsonEncode({"enabled": enabled, "amount": amount, "threshold": threshold}),
+      body: jsonEncode({
+        "enabled": enabled,
+        "amount": amount,
+        "threshold": threshold,
+      }),
     );
     if (resp.statusCode != 200) {
       throw Exception("Unable to update autorecharge");
     }
   }
 
-  Future<List<Map<String, dynamic>>> getUsage(String projectId, {DateTime? start, DateTime? end, String? interval, String? report}) async {
+  Future<List<Map<String, dynamic>>> getUsage(
+    String projectId, {
+    DateTime? start,
+    DateTime? end,
+    String? interval,
+    String? report,
+  }) async {
     var uri = Uri.parse('$baseUrl/accounts/projects/$projectId/usage');
 
     if (start != null) {
-      uri = uri.replace(queryParameters: {...uri.queryParameters, "start": start.toIso8601String()});
+      uri = uri.replace(
+        queryParameters: {
+          ...uri.queryParameters,
+          "start": start.toIso8601String(),
+        },
+      );
     }
 
     if (end != null) {
-      uri = uri.replace(queryParameters: {...uri.queryParameters, "end": end.toIso8601String()});
+      uri = uri.replace(
+        queryParameters: {...uri.queryParameters, "end": end.toIso8601String()},
+      );
     }
 
     if (interval != null) {
-      uri = uri.replace(queryParameters: {...uri.queryParameters, "interval": interval});
+      uri = uri.replace(
+        queryParameters: {...uri.queryParameters, "interval": interval},
+      );
     }
 
     if (report != null) {
-      uri = uri.replace(queryParameters: {...uri.queryParameters, "report": report});
+      uri = uri.replace(
+        queryParameters: {...uri.queryParameters, "report": report},
+      );
     }
 
     final response = await http.get(uri, headers: _getHeaders());
 
     List<Map<String, dynamic>> results = [];
 
-    for (final map in (jsonDecode(response.body) as Map<String, dynamic>)["usage"]) {
+    for (final map
+        in (jsonDecode(response.body) as Map<String, dynamic>)["usage"]) {
       results.add(map);
     }
 
@@ -473,28 +596,49 @@ abstract class AccountsClient {
   /// Corresponds to: POST /accounts/projects/:project_id/users/:user_id
   /// Body: { "is_admin" }
   /// Returns JSON like { "ok": true } on success.
-  Future<void> setUserIsAdmin(String projectId, String userId, bool isAdmin) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/users/$userId');
+  Future<void> setUserIsAdmin(
+    String projectId,
+    String userId,
+    bool isAdmin,
+  ) async {
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/users/$userId',
+    );
     final body = {'is_admin': isAdmin};
 
-    final response = await http.put(uri, headers: _getHeaders(), body: jsonEncode(body));
+    final response = await http.put(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(body),
+    );
 
     if (response.statusCode >= 400) {
-      throw AccountsClientException('Failed to add user to project. Status code: ${response.statusCode}, body: ${response.body}');
+      throw AccountsClientException(
+        'Failed to add user to project. Status code: ${response.statusCode}, body: ${response.body}',
+      );
     }
   }
 
   /// Corresponds to: POST /accounts/projects/:project_id/users
   /// Body: { "project_id", "user_id" }
   /// Returns JSON like { "ok": true } on success.
-  Future<Map<String, dynamic>> addUserToProjectByEmail(String projectId, String email) async {
+  Future<Map<String, dynamic>> addUserToProjectByEmail(
+    String projectId,
+    String email,
+  ) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/users');
     final body = {'project_id': projectId, 'email': email};
 
-    final response = await http.post(uri, headers: _getHeaders(), body: jsonEncode(body));
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(body),
+    );
 
     if (response.statusCode >= 400) {
-      throw AccountsClientException('Failed to add user to project. Status code: ${response.statusCode}, body: ${response.body}');
+      throw AccountsClientException(
+        'Failed to add user to project. Status code: ${response.statusCode}, body: ${response.body}',
+      );
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
@@ -502,8 +646,13 @@ abstract class AccountsClient {
   /// Corresponds to: DELETE /accounts/projects/:project_id/users
   /// Body: { "project_id", "user_id" }
   /// Returns JSON like { "ok": true } on success.
-  Future<Map<String, dynamic>> removeUserFromProject(String projectId, String userId) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/users/$userId');
+  Future<Map<String, dynamic>> removeUserFromProject(
+    String projectId,
+    String userId,
+  ) async {
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/users/$userId',
+    );
 
     final request = http.Request('DELETE', uri)..headers.addAll(_getHeaders());
 
@@ -511,7 +660,9 @@ abstract class AccountsClient {
     final response = await http.Response.fromStream(streamedResponse);
 
     if (response.statusCode >= 400) {
-      throw AccountsClientException('Failed to remove user from project. Status code: ${response.statusCode}, body: ${response.body}');
+      throw AccountsClientException(
+        'Failed to remove user from project. Status code: ${response.statusCode}, body: ${response.body}',
+      );
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
@@ -523,9 +674,13 @@ abstract class AccountsClient {
     final response = await http.get(uri, headers: _getHeaders());
 
     if (response.statusCode >= 400) {
-      throw AccountsClientException('Failed to get users in project. Status code: ${response.statusCode}, body: ${response.body}');
+      throw AccountsClientException(
+        'Failed to get users in project. Status code: ${response.statusCode}, body: ${response.body}',
+      );
     }
-    return (jsonDecode(response.body)["users"] as List).whereType<Map<String, dynamic>>().toList();
+    return (jsonDecode(response.body)["users"] as List)
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
   /// Corresponds to: GET /accounts/profiles/:user_id
@@ -536,7 +691,9 @@ abstract class AccountsClient {
     final response = await http.get(uri, headers: _getHeaders());
 
     if (response.statusCode >= 400) {
-      throw AccountsClientException('Failed to get user profile. Status code: ${response.statusCode}, body: ${response.body}');
+      throw AccountsClientException(
+        'Failed to get user profile. Status code: ${response.statusCode}, body: ${response.body}',
+      );
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
@@ -544,14 +701,24 @@ abstract class AccountsClient {
   /// Corresponds to: PUT /accounts/profiles/:user_id
   /// Body: { "first_name", "last_name" }
   /// Returns JSON like { "ok": true } on success.
-  Future<Map<String, dynamic>> updateUserProfile(String userId, String firstName, String lastName) async {
+  Future<Map<String, dynamic>> updateUserProfile(
+    String userId,
+    String firstName,
+    String lastName,
+  ) async {
     final uri = Uri.parse('$baseUrl/accounts/profiles/$userId');
     final body = {'first_name': firstName, 'last_name': lastName};
 
-    final response = await http.put(uri, headers: _getHeaders(), body: jsonEncode(body));
+    final response = await http.put(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(body),
+    );
 
     if (response.statusCode >= 400) {
-      throw AccountsClientException('Failed to update user profile. Status code: ${response.statusCode}, body: ${response.body}');
+      throw AccountsClientException(
+        'Failed to update user profile. Status code: ${response.statusCode}, body: ${response.body}',
+      );
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
@@ -563,9 +730,13 @@ abstract class AccountsClient {
     final response = await http.get(uri, headers: _getHeaders());
 
     if (response.statusCode >= 400) {
-      throw AccountsClientException('Failed to list projects. Status code: ${response.statusCode}, body: ${response.body}');
+      throw AccountsClientException(
+        'Failed to list projects. Status code: ${response.statusCode}, body: ${response.body}',
+      );
     }
-    return (jsonDecode(response.body)["projects"] as List).whereType<Map<String, dynamic>>().toList();
+    return (jsonDecode(response.body)["projects"] as List)
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
   /// Corresponds to: GET /accounts/projects/{project_id}
@@ -575,7 +746,9 @@ abstract class AccountsClient {
     final response = await http.get(uri, headers: _getHeaders());
 
     if (response.statusCode >= 400) {
-      throw AccountsClientException('Failed to list projects. Status code: ${response.statusCode}, body: ${response.body}');
+      throw AccountsClientException(
+        'Failed to list projects. Status code: ${response.statusCode}, body: ${response.body}',
+      );
     }
     final role = (jsonDecode(response.body) as Map<String, dynamic>)["role"];
 
@@ -592,7 +765,9 @@ abstract class AccountsClient {
     final response = await http.get(uri, headers: _getHeaders());
 
     if (response.statusCode >= 400) {
-      throw AccountsClientException('Failed to list projects. Status code: ${response.statusCode}, body: ${response.body}');
+      throw AccountsClientException(
+        'Failed to list projects. Status code: ${response.statusCode}, body: ${response.body}',
+      );
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
@@ -600,11 +775,20 @@ abstract class AccountsClient {
   /// Corresponds to: POST /accounts/projects/{project_id}/participant-tokens
   /// Body: { "room_name": "<>" }
   /// Returns a JSON dict with { "token" }.
-  Future<Map<String, dynamic>> createProjectParticipantToken(String projectId, String roomName) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/participant-tokens');
+  Future<Map<String, dynamic>> createProjectParticipantToken(
+    String projectId,
+    String roomName,
+  ) async {
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/participant-tokens',
+    );
     final body = {'room_name': roomName};
 
-    final response = await http.post(uri, headers: _getHeaders(), body: jsonEncode(body));
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(body),
+    );
 
     if (response.statusCode >= 400) {
       throw AccountsClientException(
@@ -619,11 +803,19 @@ abstract class AccountsClient {
   /// Corresponds to: POST /accounts/projects/{project_id}/api-keys
   /// Body: { "name": "<>", "description": "<>" }
   /// Returns a JSON dict with { "id", "name", "description", "token" }.
-  Future<Map<String, dynamic>> createProjectApiKey(String projectId, String name, String description) async {
+  Future<Map<String, dynamic>> createProjectApiKey(
+    String projectId,
+    String name,
+    String description,
+  ) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/api-keys');
     final body = {'name': name, 'description': description};
 
-    final response = await http.post(uri, headers: _getHeaders(), body: jsonEncode(body));
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(body),
+    );
 
     if (response.statusCode >= 400) {
       throw AccountsClientException(
@@ -638,7 +830,9 @@ abstract class AccountsClient {
   /// Corresponds to: DELETE /accounts/projects/{project_id}/api-keys/{token_id}
   /// Returns 204 No Content on success (no JSON body).
   Future<void> deleteProjectApiKey(String projectId, String tokenId) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/api-keys/$tokenId');
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/api-keys/$tokenId',
+    );
     final response = await http.delete(uri, headers: _getHeaders());
 
     if (response.statusCode >= 400) {
@@ -653,7 +847,9 @@ abstract class AccountsClient {
 
   /// Corresponds to: GET /accounts/projects/{project_id}/api-keys
   /// Returns a JSON dict like: { "tokens": [ { ... }, ... ] }.
-  Future<List<Map<String, dynamic>>> listProjectApiKeys(String projectId) async {
+  Future<List<Map<String, dynamic>>> listProjectApiKeys(
+    String projectId,
+  ) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/api-keys');
     final response = await http.get(uri, headers: _getHeaders());
 
@@ -663,12 +859,16 @@ abstract class AccountsClient {
         'Status code: ${response.statusCode}, body: ${response.body}',
       );
     }
-    return (jsonDecode(response.body)["keys"] as List).whereType<Map<String, dynamic>>().toList();
+    return (jsonDecode(response.body)["keys"] as List)
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
   /// Corresponds to: GET /accounts/projects/{project_id}/api-keys/{token_id}/decrypt
   Future<String> decryptProjectApiKey(String projectId, String tokenId) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/api-keys/$tokenId/decrypt');
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/api-keys/$tokenId/decrypt',
+    );
     final response = await http.get(uri, headers: _getHeaders());
 
     if (response.statusCode >= 400) {
@@ -682,7 +882,9 @@ abstract class AccountsClient {
 
   /// Corresponds to: GET /accounts/projects/{project_id}/sessions
   /// Returns a JSON dict: { "sessions": [...] }
-  Future<List<Map<String, dynamic>>> listRecentSessions(String projectId) async {
+  Future<List<Map<String, dynamic>>> listRecentSessions(
+    String projectId,
+  ) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/sessions');
     final response = await http.get(uri, headers: _getHeaders());
 
@@ -692,15 +894,26 @@ abstract class AccountsClient {
         'Status code: ${response.statusCode}, body: ${response.body}',
       );
     }
-    return (jsonDecode(response.body)["sessions"] as List).whereType<Map<String, dynamic>>().toList();
+    return (jsonDecode(response.body)["sessions"] as List)
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
-  Future<String> getCreditsCheckoutUrl(String projectId, String successUrl, String cancelUrl, double quantity) async {
+  Future<String> getCreditsCheckoutUrl(
+    String projectId,
+    String successUrl,
+    String cancelUrl,
+    double quantity,
+  ) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/credits');
     final response = await http.post(
       uri,
       headers: _getHeaders(),
-      body: jsonEncode({"quantity": quantity, "success_url": successUrl, "cancel_url": cancelUrl}),
+      body: jsonEncode({
+        "quantity": quantity,
+        "success_url": successUrl,
+        "cancel_url": cancelUrl,
+      }),
     );
 
     if (response.statusCode >= 400) {
@@ -712,9 +925,17 @@ abstract class AccountsClient {
     return jsonDecode(response.body)["checkout_url"];
   }
 
-  Future<String> getCheckoutUrl(String projectId, String successUrl, String cancelUrl) async {
+  Future<String> getCheckoutUrl(
+    String projectId,
+    String successUrl,
+    String cancelUrl,
+  ) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/subscription');
-    final response = await http.post(uri, headers: _getHeaders(), body: jsonEncode({"success_url": successUrl, "cancel_url": cancelUrl}));
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode({"success_url": successUrl, "cancel_url": cancelUrl}),
+    );
 
     if (response.statusCode >= 400) {
       throw AccountsClientException(
@@ -727,8 +948,13 @@ abstract class AccountsClient {
 
   /// Corresponds to: GET /accounts/projects/{project_id}/sessions/{session_id}
   /// Returns a JSON dict: {"id","room_name","created_at"}
-  Future<Map<String, dynamic>> getSession(String projectId, String sessionId) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/sessions/$sessionId');
+  Future<Map<String, dynamic>> getSession(
+    String projectId,
+    String sessionId,
+  ) async {
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/sessions/$sessionId',
+    );
     final response = await http.get(uri, headers: _getHeaders());
 
     if (response.statusCode >= 400) {
@@ -741,8 +967,13 @@ abstract class AccountsClient {
   }
 
   /// Corresponds to: POST /accounts/projects/{project_id}/sessions/{session_id}/terminate
-  Future<void> terminate({required String projectId, required String sessionId}) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/sessions/$sessionId/terminate');
+  Future<void> terminate({
+    required String projectId,
+    required String sessionId,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/sessions/$sessionId/terminate',
+    );
     final response = await http.post(uri, headers: _getHeaders());
 
     if (response.statusCode >= 400) {
@@ -770,8 +1001,13 @@ abstract class AccountsClient {
 
   /// Corresponds to: GET /accounts/projects/{project_id}/sessions/{session_id}/events
   /// Returns a JSON dict: { "events": [...] }
-  Future<List<Map<String, dynamic>>> listSessionEvents(String projectId, String sessionId) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/sessions/$sessionId/events');
+  Future<List<Map<String, dynamic>>> listSessionEvents(
+    String projectId,
+    String sessionId,
+  ) async {
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/sessions/$sessionId/events',
+    );
     final response = await http.get(uri, headers: _getHeaders());
 
     if (response.statusCode >= 400) {
@@ -780,13 +1016,20 @@ abstract class AccountsClient {
         'Status code: ${response.statusCode}, body: ${response.body}',
       );
     }
-    return (jsonDecode(response.body)["events"] as List).whereType<Map<String, dynamic>>().toList();
+    return (jsonDecode(response.body)["events"] as List)
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
   /// Corresponds to: GET /accounts/projects/{project_id}/sessions/{session_id}/spans
   /// Returns a JSON dict: { "spans": [...] }
-  Future<List<Map<String, dynamic>>> listSessionSpans(String projectId, String sessionId) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/sessions/$sessionId/spans');
+  Future<List<Map<String, dynamic>>> listSessionSpans(
+    String projectId,
+    String sessionId,
+  ) async {
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/sessions/$sessionId/spans',
+    );
     final response = await http.get(uri, headers: _getHeaders());
 
     if (response.statusCode >= 400) {
@@ -795,13 +1038,20 @@ abstract class AccountsClient {
         'Status code: ${response.statusCode}, body: ${response.body}',
       );
     }
-    return (jsonDecode(response.body)["spans"] as List).whereType<Map<String, dynamic>>().toList();
+    return (jsonDecode(response.body)["spans"] as List)
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
   /// Corresponds to: GET /accounts/projects/{project_id}/sessions/{session_id}/spans
   /// Returns a JSON dict: { "spans": [...] }
-  Future<List<Map<String, dynamic>>> listSessionMetrics(String projectId, String sessionId) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/sessions/$sessionId/metrics');
+  Future<List<Map<String, dynamic>>> listSessionMetrics(
+    String projectId,
+    String sessionId,
+  ) async {
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/sessions/$sessionId/metrics',
+    );
     final response = await http.get(uri, headers: _getHeaders());
 
     if (response.statusCode >= 400) {
@@ -810,7 +1060,9 @@ abstract class AccountsClient {
         'Status code: ${response.statusCode}, body: ${response.body}',
       );
     }
-    return (jsonDecode(response.body)["metrics"] as List).whereType<Map<String, dynamic>>().toList();
+    return (jsonDecode(response.body)["metrics"] as List)
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
   /// Corresponds to: POST /accounts/projects/{project_id}/webhooks
@@ -826,9 +1078,20 @@ abstract class AccountsClient {
     String? payload,
   }) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/webhooks');
-    final body = {'name': name, 'description': description, 'url': url, 'events': events, 'payload': payload, 'action': action};
+    final body = {
+      'name': name,
+      'description': description,
+      'url': url,
+      'events': events,
+      'payload': payload,
+      'action': action,
+    };
 
-    final response = await http.post(uri, headers: _getHeaders(), body: jsonEncode(body));
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(body),
+    );
 
     if (response.statusCode >= 400) {
       throw AccountsClientException(
@@ -852,10 +1115,23 @@ abstract class AccountsClient {
     String? action,
     String? payload,
   }) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/webhooks/$webhookId');
-    final body = {'name': name, 'description': description, 'url': url, 'events': events, 'payload': payload, 'action': action};
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/webhooks/$webhookId',
+    );
+    final body = {
+      'name': name,
+      'description': description,
+      'url': url,
+      'events': events,
+      'payload': payload,
+      'action': action,
+    };
 
-    final response = await http.put(uri, headers: _getHeaders(), body: jsonEncode(body));
+    final response = await http.put(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(body),
+    );
 
     if (response.statusCode >= 400) {
       throw AccountsClientException(
@@ -868,7 +1144,9 @@ abstract class AccountsClient {
 
   /// Corresponds to: GET /accounts/projects/{project_id}/webhooks
   /// Returns a JSON dict like { "webhooks": [ { ... }, ... ] }.
-  Future<List<Map<String, dynamic>>> listProjectWebhooks(String projectId) async {
+  Future<List<Map<String, dynamic>>> listProjectWebhooks(
+    String projectId,
+  ) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/webhooks');
     final response = await http.get(uri, headers: _getHeaders());
 
@@ -878,13 +1156,17 @@ abstract class AccountsClient {
         'Status code: ${response.statusCode}, body: ${response.body}',
       );
     }
-    return (jsonDecode(response.body)["webhooks"] as List).whereType<Map<String, dynamic>>().toList();
+    return (jsonDecode(response.body)["webhooks"] as List)
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
   /// Corresponds to: DELETE /accounts/projects/{project_id}/webhooks/{webhook_id}
   /// Typically returns 200 or 204 on success (no JSON body).
   Future<void> deleteProjectWebhook(String projectId, String webhookId) async {
-    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/webhooks/$webhookId');
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/webhooks/$webhookId',
+    );
     final response = await http.delete(uri, headers: _getHeaders());
 
     if (response.statusCode >= 400) {
