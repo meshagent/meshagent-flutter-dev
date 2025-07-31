@@ -141,7 +141,7 @@ class _ContainerTerminal extends State<ContainerTerminal> {
     super.initState();
     terminal = Terminal(
       onOutput: (data) {
-        widget.tty.write(Uint8List.fromList([0, ...utf8.encode(data)]));
+        widget.tty.write(utf8.encode(data));
       },
       onResize: onResize,
     );

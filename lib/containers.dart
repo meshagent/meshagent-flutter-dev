@@ -122,7 +122,22 @@ class _ImageTableState extends State<ImageTable> {
                               await showShadDialog(
                                 context: context,
                                 builder: (context) {
-                                  return ContainerTerminal(tty: tty);
+                                  tty.result.then((value) {
+                                    if (context.mounted) {
+                                      Navigator.of(context).pop(value);
+                                    }
+                                  });
+                                  return ShadDialog(
+                                    constraints: BoxConstraints.tight(
+                                      Size(1200, 800),
+                                    ),
+                                    title: Text("Container Terminal"),
+                                    child: SizedBox(
+                                      width: 1200,
+                                      height: 800,
+                                      child: ContainerTerminal(tty: tty),
+                                    ),
+                                  );
                                 },
                               );
 
