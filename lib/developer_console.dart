@@ -8,6 +8,7 @@ import './terminal.dart';
 import "./trace_viewer.dart";
 import 'package:stream_transform/stream_transform.dart';
 import 'package:flutter/services.dart';
+import './containers.dart';
 
 class RoomDeveloperLogsListener extends StatefulWidget {
   const RoomDeveloperLogsListener({
@@ -60,7 +61,15 @@ class _RoomDeveloperLogsListenerState extends State<RoomDeveloperLogsListener> {
   }
 }
 
-enum DeveloperConsoleView { logs, traces, metrics, terminal }
+enum DeveloperConsoleView {
+  logs,
+  traces,
+  metrics,
+  terminal,
+  containers,
+  images,
+  builds,
+}
 
 DeveloperConsoleView view = DeveloperConsoleView.traces;
 
@@ -68,12 +77,12 @@ class RoomDeveloperConsole extends StatefulWidget {
   const RoomDeveloperConsole({
     super.key,
     required this.events,
-    required this.client,
+    required this.room,
     required this.pricing,
   });
 
   final Map<String, dynamic>? pricing;
-  final RoomClient client;
+  final RoomClient room;
   final List<RoomEvent> events;
 
   @override
@@ -86,35 +95,88 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: EdgeInsets.only(top: 20, bottom: 8, left: 20),
-          child: SizedBox(
-            width: 400,
-            child: ShadTabs<DeveloperConsoleView>(
-              value: view,
-              onChanged: (value) {
-                setState(() {
-                  view = value;
-                });
-              },
-              tabs: [
-                ShadTab(value: DeveloperConsoleView.logs, child: Text("Logs")),
-                ShadTab(
-                  value: DeveloperConsoleView.traces,
-                  child: Text("Traces"),
+          child: Row(
+            mainAxisSize: MainAxisSize.max,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 300,
+                child: ShadTabs<DeveloperConsoleView>(
+                  value: view,
+                  onChanged: (value) {
+                    setState(() {
+                      view = value;
+                    });
+                  },
+                  tabs: [
+                    ShadTab(
+                      value: DeveloperConsoleView.logs,
+                      child: Text("Logs"),
+                    ),
+                    ShadTab(
+                      value: DeveloperConsoleView.traces,
+                      child: Text("Traces"),
+                    ),
+                    ShadTab(
+                      value: DeveloperConsoleView.metrics,
+                      child: Text("Metrics"),
+                    ),
+                  ],
                 ),
-                ShadTab(
-                  value: DeveloperConsoleView.metrics,
-                  child: Text("Metrics"),
+              ),
+
+              SizedBox(width: 15),
+
+              SizedBox(
+                width: 500,
+                child: ShadTabs<DeveloperConsoleView>(
+                  value: view,
+                  onChanged: (value) {
+                    setState(() {
+                      view = value;
+                    });
+                  },
+                  tabs: [
+                    ShadTab(
+                      value: DeveloperConsoleView.images,
+                      child: Text("Images"),
+                    ),
+                    ShadTab(
+                      value: DeveloperConsoleView.containers,
+                      child: Text("Containers"),
+                    ),
+                    ShadTab(
+                      value: DeveloperConsoleView.builds,
+                      child: Text("Builds"),
+                    ),
+                  ],
                 ),
-                ShadTab(
-                  value: DeveloperConsoleView.terminal,
-                  child: Text("Terminal"),
+              ),
+
+              SizedBox(width: 15),
+
+              SizedBox(
+                width: 100,
+                child: ShadTabs<DeveloperConsoleView>(
+                  value: view,
+                  onChanged: (value) {
+                    setState(() {
+                      view = value;
+                    });
+                  },
+                  tabs: [
+                    ShadTab(
+                      value: DeveloperConsoleView.terminal,
+                      child: Text("Terminal"),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
 
@@ -123,22 +185,26 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
             DeveloperConsoleView.traces => LiveTraceViewer(
               events: Stream.fromIterable(
                 widget.events,
-              ).followedBy(widget.client.events),
+              ).followedBy(widget.room.events),
             ),
             DeveloperConsoleView.logs => LiveLogViewer(
               events: Stream.fromIterable(
                 widget.events,
-              ).followedBy(widget.client.events),
+              ).followedBy(widget.room.events),
             ),
             DeveloperConsoleView.metrics => LiveMetricsViewer(
               pricing: widget.pricing,
               events: Stream.fromIterable(
                 widget.events,
-              ).followedBy(widget.client.events),
+              ).followedBy(widget.room.events),
             ),
-            DeveloperConsoleView.terminal => RoomTerminal(
-              client: widget.client,
+            DeveloperConsoleView.terminal => RoomTerminal(client: widget.room),
+
+            DeveloperConsoleView.images => ImageTable(client: widget.room),
+            DeveloperConsoleView.containers => ContainerTable(
+              client: widget.room,
             ),
+            DeveloperConsoleView.builds => BuildTable(client: widget.room),
           },
         ),
       ],
