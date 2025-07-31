@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:meshagent/meshagent.dart';
 import 'package:meshagent_flutter_dev/accounts_client.dart';
+import 'package:meshagent_flutter_dev/terminal.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
@@ -101,12 +102,32 @@ class _ImageTableState extends State<ImageTable> {
                               if (vars == null) {
                                 return;
                               }
+
+                              widget.client.containers.run(
+                                image:
+                                    img.tags.isNotEmpty
+                                        ? img.tags.first
+                                        : img.id,
+                                variables: vars,
+                              );
+                            } else {
+                              final tty = widget.client.containers.tty(
+                                image:
+                                    img.tags.isNotEmpty
+                                        ? img.tags.first
+                                        : img.id,
+                                command: "/bin/bash",
+                              );
+
+                              await showShadDialog(
+                                context: context,
+                                builder: (context) {
+                                  return ContainerTerminal(tty: tty);
+                                },
+                              );
+
+                              // TODO: kill it
                             }
-                            widget.client.containers.run(
-                              image:
-                                  img.tags.isNotEmpty ? img.tags.first : img.id,
-                              variables: vars,
-                            );
 
                             ShadToaster.of(context).show(
                               const ShadToast(
@@ -293,7 +314,10 @@ class _ContainerTableState extends State<ContainerTable> {
                     DataCell(
                       Text(
                         ((c.entrypoint != null)
-                                ? [...c.entrypoint!, ...c.command]
+                                ? [
+                                  ...c.entrypoint!,
+                                  if (c.command != null) ...c.command!,
+                                ]
                                 : [c.image])
                             .join(' '),
                       ),
@@ -604,57 +628,60 @@ class _ConfigureServiceTemplateDialog
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             const SizedBox(height: 4),
-            ...widget.spec.variables!.map(
-              (v) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child:
-                    v.enumValues == null
-                        ? ShadInputFormField(
-                          label: Text(v.name),
-                          obscureText: v.obscure,
-                          description:
-                              v.description == null
-                                  ? null
-                                  : Text(v.description ?? ''),
+            if (widget.spec.variables != null)
+              ...widget.spec.variables!.map(
+                (v) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child:
+                      v.enumValues == null
+                          ? ShadInputFormField(
+                            label: Text(v.name),
+                            obscureText: v.obscure,
+                            description:
+                                v.description == null
+                                    ? null
+                                    : Text(v.description ?? ''),
 
-                          validator:
-                              v.optional
-                                  ? null
-                                  : (txt) =>
-                                      (txt.trim().isEmpty)
-                                          ? '${v.name} is required'
-                                          : null,
-                          onChanged:
-                              (txt) => setState(() => _vars[v.name] = txt),
-                        )
-                        : ShadSelectFormField<String>(
-                          label: Text(v.name),
-                          initialValue: v.enumValues![0],
-                          selectedOptionBuilder:
-                              (context, value) => Text(value),
-                          options: [
-                            ...v.enumValues!.map(
-                              (v) =>
-                                  ShadOption<String>(value: v, child: Text(v)),
-                            ),
-                          ],
-                          description:
-                              v.description == null
-                                  ? null
-                                  : Text(v.description ?? ''),
-                          validator:
-                              v.optional
-                                  ? null
-                                  : (txt) =>
-                                      (txt?.trim().isEmpty == true ||
-                                              txt == null)
-                                          ? '${v.name} is required'
-                                          : null,
-                          onChanged:
-                              (txt) => setState(() => _vars[v.name] = txt!),
-                        ),
+                            validator:
+                                v.optional
+                                    ? null
+                                    : (txt) =>
+                                        (txt.trim().isEmpty)
+                                            ? '${v.name} is required'
+                                            : null,
+                            onChanged:
+                                (txt) => setState(() => _vars[v.name] = txt),
+                          )
+                          : ShadSelectFormField<String>(
+                            label: Text(v.name),
+                            initialValue: v.enumValues![0],
+                            selectedOptionBuilder:
+                                (context, value) => Text(value),
+                            options: [
+                              ...v.enumValues!.map(
+                                (v) => ShadOption<String>(
+                                  value: v,
+                                  child: Text(v),
+                                ),
+                              ),
+                            ],
+                            description:
+                                v.description == null
+                                    ? null
+                                    : Text(v.description ?? ''),
+                            validator:
+                                v.optional
+                                    ? null
+                                    : (txt) =>
+                                        (txt?.trim().isEmpty == true ||
+                                                txt == null)
+                                            ? '${v.name} is required'
+                                            : null,
+                            onChanged:
+                                (txt) => setState(() => _vars[v.name] = txt!),
+                          ),
+                ),
               ),
-            ),
 
             // ── Command preview ─────────────────────────────────────────────
             if (widget.spec.command != null) ...[

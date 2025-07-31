@@ -125,3 +125,100 @@ class _RoomTerminal extends State<RoomTerminal> {
     );
   }
 }
+
+class ContainerTerminal extends StatefulWidget {
+  const ContainerTerminal({super.key, required this.tty});
+
+  final ContainerTTY tty;
+
+  @override
+  State createState() => _ContainerTerminal();
+}
+
+class _ContainerTerminal extends State<ContainerTerminal> {
+  @override
+  void initState() {
+    super.initState();
+    terminal = Terminal(
+      onOutput: (data) {
+        widget.tty.write(Uint8List.fromList([0, ...utf8.encode(data)]));
+      },
+      onResize: onResize,
+    );
+
+    watch();
+  }
+
+  bool connecting = true;
+  bool closed = false;
+
+  @override
+  void dispose() {
+    super.dispose();
+    subStderr.cancel();
+    subStdout.cancel();
+  }
+
+  void watch() {
+    subStderr = widget.tty.stderr.listen(onData);
+    subStdout = widget.tty.stdout.listen(onData);
+  }
+
+  void onData(data) {
+    if (mounted) {
+      setState(() {
+        connecting = false;
+      });
+    }
+    if (data is Uint8List) {
+      final text = utf8.decode(data);
+      terminal.write(text);
+    }
+  }
+
+  late final StreamSubscription subStderr;
+  late final StreamSubscription subStdout;
+
+  late final Terminal terminal;
+
+  void onResize(int width, int height, _, __) {
+    widget.tty.resize(width: width, height: height);
+  }
+
+  int width = 0;
+  int height = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    if (closed) {
+      return Center(child: Text("Terminal Session Ended"));
+    }
+    if (connecting) {
+      return Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(width: 16, height: 16, child: CircularProgressIndicator()),
+            SizedBox(width: 10),
+            Text("Terminal Session Connecting..."),
+          ],
+        ),
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return TerminalView(
+          terminal,
+          textStyle: TerminalStyle(
+            fontFamily:
+                GoogleFonts.sourceCodePro(
+                  fontWeight: FontWeight.w500,
+                ).fontFamily!,
+            fontSize: 15,
+          ),
+          padding: EdgeInsets.all(16),
+        );
+      },
+    );
+  }
+}
