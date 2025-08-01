@@ -196,16 +196,16 @@ abstract class AccountsClient {
   /// Corresponds to: POST /accounts/projects/:project_id/services
   /// Body: { "name", "image", "pull_secret", "runtime_secrets", "environment_secrets", "environment" : \<settings\> }
   /// Returns JSON like { "id" } on success.
-  Future<Map<String, dynamic>> createService({
+  Future<String> createService({
     required String projectId,
-    required Map<String, dynamic> service,
+    required Service service,
   }) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/services');
 
     final response = await http.post(
       uri,
       headers: _getHeaders(),
-      body: jsonEncode(service),
+      body: jsonEncode(service.toJson()),
     );
 
     if (response.statusCode >= 400) {
@@ -215,16 +215,16 @@ abstract class AccountsClient {
       );
     }
 
-    return jsonDecode(response.body) as Map<String, dynamic>;
+    return jsonDecode(response.body)["id"];
   }
 
   /// Corresponds to: POST /accounts/projects/:project_id/services
   /// Body: { "environment" : \<settings\> }
   /// Returns JSON like { "id" } on success.
-  Future<Map<String, dynamic>> updateService({
+  Future<void> updateService({
     required String projectId,
     required String serviceId,
-    required Map<String, dynamic> service,
+    required Service service,
   }) async {
     final uri = Uri.parse(
       '$baseUrl/accounts/projects/$projectId/services/$serviceId',
@@ -233,7 +233,7 @@ abstract class AccountsClient {
     final response = await http.put(
       uri,
       headers: _getHeaders(),
-      body: jsonEncode(service),
+      body: jsonEncode(service.toJson()),
     );
 
     if (response.statusCode >= 400) {
@@ -242,13 +242,11 @@ abstract class AccountsClient {
         'Status code: ${response.statusCode}, body: ${response.body}',
       );
     }
-
-    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
   /// Corresponds to: GET /accounts/projects/{project_id}/services
   /// Returns a JSON dict like: { "tokens": [ { ... }, ... ] }.
-  Future<List<Map<String, dynamic>>> getProjectService({
+  Future<List<Service>> getProjectService({
     required String projectId,
     required String serviceId,
   }) async {
@@ -268,9 +266,7 @@ abstract class AccountsClient {
 
   /// Corresponds to: GET /accounts/projects/{project_id}/services
   /// Returns a JSON dict like: { "tokens": [ { ... }, ... ] }.
-  Future<List<Map<String, dynamic>>> listProjectServices(
-    String projectId,
-  ) async {
+  Future<List<Service>> listProjectServices(String projectId) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/services');
     final response = await http.get(uri, headers: _getHeaders());
 
@@ -282,6 +278,7 @@ abstract class AccountsClient {
     }
     return (jsonDecode(response.body)["services"] as List)
         .whereType<Map<String, dynamic>>()
+        .map((a) => Service.fromJson(a))
         .toList();
   }
 
@@ -1187,4 +1184,231 @@ class AccountsClientException implements Exception {
 
   @override
   String toString() => 'HttpException: $message';
+}
+
+class Endpoint {
+  String? type; // "mcp.sse", "meshagent.callable", "http", "tcp"
+  String? path;
+  String? participantName;
+  String? role; // "user", "tool", "agent"
+
+  Endpoint({this.type, this.path, this.participantName, this.role});
+
+  factory Endpoint.fromJson(Map<String, dynamic> json) => Endpoint(
+    type: json['type'] as String?,
+    path: json['path'] as String?,
+    participantName: json['participant_name'] as String?,
+    role: json['role'] as String?,
+  );
+
+  Map<String, dynamic> toJson() => {
+    if (type != null) 'type': type,
+    if (path != null) 'path': path,
+    if (participantName != null) 'participant_name': participantName,
+    if (role != null) 'role': role,
+  };
+}
+
+class Port {
+  String? livenessPath;
+  String? participantName;
+
+  String? type; // "mcp.sse", "meshagent.callable", "http", "tcp"
+  String? path;
+
+  List<Endpoint>? endpoints;
+
+  Port({
+    this.livenessPath,
+    this.participantName,
+    this.type,
+    this.path,
+    this.endpoints,
+  });
+
+  factory Port.fromJson(Map<String, dynamic> json) => Port(
+    livenessPath: json['liveness_path'] as String?,
+    participantName: json['participant_name'] as String?,
+    type: json['type'] as String?,
+    path: json['path'] as String?,
+    endpoints:
+        (json['endpoints'] as List?)
+            ?.map((e) => Endpoint.fromJson(e as Map<String, dynamic>))
+            .toList(),
+  );
+
+  Map<String, dynamic> toJson() => {
+    if (livenessPath != null) 'liveness_path': livenessPath,
+    if (participantName != null) 'participant_name': participantName,
+    if (type != null) 'type': type,
+    if (path != null) 'path': path,
+    if (endpoints != null)
+      'endpoints': endpoints!.map((e) => e.toJson()).toList(),
+  };
+}
+
+class RoomStorageMount {
+  String path;
+  String? subpath;
+  bool readOnly;
+
+  RoomStorageMount({required this.path, this.subpath, this.readOnly = false});
+
+  factory RoomStorageMount.fromJson(Map<String, dynamic> json) =>
+      RoomStorageMount(
+        path: json['path'] as String,
+        subpath: json['subpath'] as String?,
+        readOnly: json['read_only'] as bool? ?? false,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'path': path,
+    if (subpath != null) 'subpath': subpath,
+    'read_only': readOnly,
+  };
+}
+
+class ProjectStorageMount {
+  String path;
+  String? subpath;
+  bool readOnly;
+
+  ProjectStorageMount({required this.path, this.subpath, this.readOnly = true});
+
+  factory ProjectStorageMount.fromJson(Map<String, dynamic> json) =>
+      ProjectStorageMount(
+        path: json['path'] as String,
+        subpath: json['subpath'] as String?,
+        readOnly: json['read_only'] as bool? ?? true,
+      );
+
+  Map<String, dynamic> toJson() => {
+    'path': path,
+    if (subpath != null) 'subpath': subpath,
+    'read_only': readOnly,
+  };
+}
+
+class ServiceStorageMounts {
+  List<RoomStorageMount>? room;
+  List<ProjectStorageMount>? project;
+
+  ServiceStorageMounts({this.room, this.project});
+
+  factory ServiceStorageMounts.fromJson(
+    Map<String, dynamic> json,
+  ) => ServiceStorageMounts(
+    room:
+        (json['room'] as List?)
+            ?.map((e) => RoomStorageMount.fromJson(e as Map<String, dynamic>))
+            .toList(),
+    project:
+        (json['project'] as List?)
+            ?.map(
+              (e) => ProjectStorageMount.fromJson(e as Map<String, dynamic>),
+            )
+            .toList(),
+  );
+
+  Map<String, dynamic> toJson() => {
+    if (room != null) 'room': room!.map((e) => e.toJson()).toList(),
+    if (project != null) 'project': project!.map((e) => e.toJson()).toList(),
+  };
+}
+
+class Service {
+  String? id;
+  final String image;
+  final String name;
+
+  Map<String, String>? environment;
+  String? command;
+  String? roomStoragePath;
+  String? roomStorageSubpath;
+  String? pullSecret;
+  Map<String, String>? runtimeSecrets;
+  List<String>? environmentSecrets;
+  String? createdAt;
+  Map<String, Port>? ports;
+  String? role; // "user", "tool", "agent"
+  bool builtin;
+  ServiceStorageMounts? storage;
+
+  Service({
+    this.id,
+    required this.image,
+    required this.name,
+    this.environment,
+    this.command,
+    this.roomStoragePath,
+    this.roomStorageSubpath,
+    this.pullSecret,
+    this.runtimeSecrets,
+    this.environmentSecrets,
+    this.createdAt,
+    this.ports,
+    this.role,
+    this.builtin = false,
+    this.storage,
+  });
+
+  factory Service.fromJson(Map<String, dynamic> json) => Service(
+    id: json['id'] as String?,
+    image: json['image'] as String,
+    name: json['name'] as String,
+    environment: (json['environment'] as Map?)?.cast<String, String>(),
+    command: json['command'] as String?,
+    roomStoragePath: json['room_storage_path'] as String?,
+    roomStorageSubpath: json['room_storage_subpath'] as String?,
+    pullSecret: json['pull_secret'] as String?,
+    runtimeSecrets: (json['runtime_secrets'] as Map?)?.cast<String, String>(),
+    environmentSecrets: (json['environment_secrets'] as List?)?.cast<String>(),
+    createdAt: json['created_at'] as String?,
+    ports: (json['ports'] as Map?)?.map(
+      (k, v) => MapEntry(k as String, Port.fromJson(v as Map<String, dynamic>)),
+    ),
+    role: json['role'] as String?,
+    builtin: json['builtin'] as bool? ?? false,
+    storage:
+        json['storage'] != null
+            ? ServiceStorageMounts.fromJson(
+              json['storage'] as Map<String, dynamic>,
+            )
+            : null,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'image': image,
+    'name': name,
+    if (id != null) 'id': id,
+    if (environment != null) 'environment': environment,
+    if (command != null) 'command': command,
+    if (roomStoragePath != null) 'room_storage_path': roomStoragePath,
+    if (roomStorageSubpath != null) 'room_storage_subpath': roomStorageSubpath,
+    if (pullSecret != null) 'pull_secret': pullSecret,
+    if (runtimeSecrets != null) 'runtime_secrets': runtimeSecrets,
+    if (environmentSecrets != null) 'environment_secrets': environmentSecrets,
+    if (createdAt != null) 'created_at': createdAt,
+    if (ports != null) 'ports': ports!.map((k, v) => MapEntry(k, v.toJson())),
+    if (role != null) 'role': role,
+    'builtin': builtin,
+    if (storage != null) 'storage': storage!.toJson(),
+  };
+}
+
+class Services {
+  final List<Service> services;
+
+  Services({required this.services});
+
+  factory Services.fromJson(Map<String, dynamic> json) => Services(
+    services:
+        (json['services'] as List)
+            .map((e) => Service.fromJson(e as Map<String, dynamic>))
+            .toList(),
+  );
+
+  Map<String, dynamic> toJson() => {
+    'services': services.map((e) => e.toJson()).toList(),
+  };
 }
