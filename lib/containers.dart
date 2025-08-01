@@ -820,7 +820,7 @@ class _ContainerLogStream extends State<ContainerLogStream> {
     reload();
   }
 
-  LogProgress? progress;
+  final progress = Map<String, LogProgress>();
   void reload() {
     logSub?.cancel();
     logSub = widget.logs.stream.listen((l) {
@@ -835,7 +835,9 @@ class _ContainerLogStream extends State<ContainerLogStream> {
     progressSub?.cancel();
     progressSub = widget.logs.progress.listen((p) {
       setState(() {
-        progress = p;
+        if (p.layer != null) {
+          progress[p.layer!] = p;
+        }
       });
     });
   }
@@ -861,16 +863,16 @@ class _ContainerLogStream extends State<ContainerLogStream> {
 
   @override
   Widget build(BuildContext context) {
+    final inProgress =
+        progress!.entries
+            .where(
+              (entry) =>
+                  entry.value.current != null && entry.value.total != null,
+            )
+            .toList();
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (progress != null) ...[
-          Text(progress!.message),
-          if (progress!.current != null && progress!.total != null)
-            LinearProgressIndicator(
-              value:
-                  progress!.current!.toDouble() / progress!.total!.toDouble(),
-            ),
-        ],
         Expanded(
           child: SelectionArea(
             child: Container(
@@ -895,6 +897,40 @@ class _ContainerLogStream extends State<ContainerLogStream> {
                 ],
               ),
             ),
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.all(8),
+          child: Wrap(
+            alignment: WrapAlignment.start,
+            spacing: 10,
+            children: [
+              for (final entry in inProgress) ...[
+                ShadBadge.outline(
+                  child: Row(
+                    spacing: 8,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(LucideIcons.layers),
+                      Text("${entry.value.message} (${entry.value.layer})"),
+
+                      SizedBox(
+                        width: 10,
+                        height: 10,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          strokeCap: StrokeCap.round,
+                          color: Colors.green,
+                          value:
+                              entry.value.current!.toDouble() /
+                              entry.value.total!.toDouble(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ],
