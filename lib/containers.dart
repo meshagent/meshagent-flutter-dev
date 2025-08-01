@@ -197,23 +197,23 @@ class _ImageTableState extends State<ImageTable> {
                         tooltip: 'Delete',
                         onPressed: () async {
                           final confirm =
-                              await showDialog<bool>(
+                              await showShadDialog<bool>(
                                 context: context,
                                 builder:
-                                    (ctx) => AlertDialog(
+                                    (ctx) => ShadDialog(
                                       title: const Text('Delete image?'),
-                                      content: Text(
+                                      child: Text(
                                         img.tags.isNotEmpty
                                             ? img.tags.first
                                             : img.id,
                                       ),
                                       actions: [
-                                        TextButton(
+                                        ShadButton.secondary(
                                           onPressed:
                                               () => Navigator.pop(ctx, false),
                                           child: const Text('Cancel'),
                                         ),
-                                        TextButton(
+                                        ShadButton.destructive(
                                           onPressed:
                                               () => Navigator.pop(ctx, true),
                                           child: const Text('Delete'),
@@ -370,22 +370,22 @@ class _ContainerTableState extends State<ContainerTable> {
                             tooltip: 'Stop',
                             onPressed: () async {
                               final confirm =
-                                  await showDialog<bool>(
+                                  await showShadDialog<bool>(
                                     context: context,
                                     builder:
-                                        (ctx) => AlertDialog(
+                                        (ctx) => ShadDialog(
                                           title: const Text('Stop container?'),
-                                          content: Text(
+                                          child: Text(
                                             'Container ${c.id.substring(0, 12)}',
                                           ),
                                           actions: [
-                                            TextButton(
+                                            ShadButton.secondary(
                                               onPressed:
                                                   () =>
                                                       Navigator.pop(ctx, false),
                                               child: const Text('Cancel'),
                                             ),
-                                            TextButton(
+                                            ShadButton.destructive(
                                               onPressed:
                                                   () =>
                                                       Navigator.pop(ctx, true),
