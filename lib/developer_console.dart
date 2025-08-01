@@ -200,7 +200,42 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
             ),
             DeveloperConsoleView.terminal => RoomTerminal(client: widget.room),
 
-            DeveloperConsoleView.images => ImageTable(client: widget.room),
+            DeveloperConsoleView.images => Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: EdgeInsetsGeometry.symmetric(horizontal: 20),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ShadButton.ghost(
+                        trailing: Icon(LucideIcons.bolt),
+                        onPressed: () async {
+                          await showShadDialog(
+                            context: context,
+                            builder: (context) => BuildImage(room: widget.room),
+                          );
+                        },
+                        child: Text("Build Image"),
+                      ),
+                      SizedBox(width: 10),
+                      ShadButton.ghost(
+                        trailing: Icon(LucideIcons.download),
+                        onPressed: () async {
+                          await showShadDialog(
+                            context: context,
+                            builder: (context) => PullImage(room: widget.room),
+                          );
+                        },
+                        child: Text("Pull Image"),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(child: ImageTable(client: widget.room)),
+              ],
+            ),
             DeveloperConsoleView.containers => ContainerTable(
               client: widget.room,
             ),

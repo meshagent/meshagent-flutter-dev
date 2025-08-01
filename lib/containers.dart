@@ -719,15 +719,23 @@ class _ConfigureServiceTemplateDialog
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 4),
-            if (widget.spec.roomStoragePath == null) Text("No storage mount"),
 
-            if (widget.spec.roomStoragePath != null) ...[
-              Text(
-                widget.spec.roomStorageSubpath == null
-                    ? "Mounts entire room's storage"
-                    : "Mounts only to ${widget.spec.roomStorageSubpath}",
-              ),
-              Text(widget.spec.roomStoragePath!),
+            if (widget.spec.storage == null ||
+                widget.spec.storage?.room == null)
+              Text("No storage mount"),
+
+            if (widget.spec.storage != null &&
+                widget.spec.storage?.room != null) ...[
+              for (final rs in widget.spec.storage!.room!) ...[
+                if (rs.subpath != null) ...[
+                  Text(
+                    rs.subpath == null
+                        ? "Mounts entire room's storage to"
+                        : "Mounts only ${rs.subpath} to",
+                  ),
+                  Text(rs.path),
+                ],
+              ],
             ],
 
             // ── Ports & endpoints summary ──────────────────────────────────
@@ -932,16 +940,9 @@ class _ContainerLogsState extends State<ContainerLogs> {
 }
 
 class BuildImage extends StatefulWidget {
-  const BuildImage({
-    super.key,
-    required this.room,
-    required this.projectId,
-    required this.accounts,
-  });
+  const BuildImage({super.key, required this.room});
 
-  final AccountsClient accounts;
   final RoomClient room;
-  final String projectId;
 
   @override
   State<BuildImage> createState() => _BuildImage();
@@ -1183,16 +1184,9 @@ class _BuildImage extends State<BuildImage> {
 }
 
 class PullImage extends StatefulWidget {
-  const PullImage({
-    super.key,
-    required this.room,
-    required this.projectId,
-    required this.accounts,
-  });
+  const PullImage({super.key, required this.room});
 
-  final AccountsClient accounts;
   final RoomClient room;
-  final String projectId;
 
   @override
   State<PullImage> createState() => _PullImage();
