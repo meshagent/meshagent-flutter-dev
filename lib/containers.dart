@@ -1183,8 +1183,9 @@ class _BuildImage extends State<BuildImage> {
                                       leading: Text("https://"),
                                       gap: 0,
                                       label: Text("git repository url"),
-                                      initialValue:
-                                          "github.com/meshagent/examples/python/chat-bot",
+                                      placeholder: Text(
+                                        "github.com/meshagent/examples",
+                                      ),
                                       validator:
                                           (value) =>
                                               value.isEmpty
@@ -1205,6 +1206,9 @@ class _BuildImage extends State<BuildImage> {
                                           child: ShadInputFormField(
                                             id: "git_username",
                                             label: Text("username"),
+                                            placeholder: Text(
+                                              "your git username",
+                                            ),
                                             initialValue: "",
                                           ),
                                         ),
@@ -1213,6 +1217,9 @@ class _BuildImage extends State<BuildImage> {
                                           child: ShadInputFormField(
                                             id: "git_password",
                                             label: Text("password"),
+                                            placeholder: Text(
+                                              "a personal access token or git password",
+                                            ),
                                             obscureText: true,
                                             initialValue: "",
                                           ),
@@ -1222,9 +1229,12 @@ class _BuildImage extends State<BuildImage> {
 
                                     ShadInputFormField(
                                       id: "git_ref",
-                                      label: Text("branch or ref"),
+                                      label: Text("branch"),
                                       obscureText: true,
                                       initialValue: "",
+                                      placeholder: Text(
+                                        "a branch name or reference to build from",
+                                      ),
                                     ),
 
                                     ShadInputFormField(
@@ -1232,6 +1242,9 @@ class _BuildImage extends State<BuildImage> {
                                       label: Text("path"),
                                       obscureText: true,
                                       initialValue: "",
+                                      placeholder: Text(
+                                        "build from a subdirectory within the repository",
+                                      ),
                                     ),
 
                                     Text(
