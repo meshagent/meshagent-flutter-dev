@@ -1182,8 +1182,9 @@ class _BuildImage extends State<BuildImage> {
                                       id: "git_url",
                                       leading: Text("https://"),
                                       gap: 0,
-                                      label: Text("git repo url"),
-                                      initialValue: "",
+                                      label: Text("git repository url"),
+                                      initialValue:
+                                          "github.com/meshagent/examples/python/chat-bot",
                                       validator:
                                           (value) =>
                                               value.isEmpty
