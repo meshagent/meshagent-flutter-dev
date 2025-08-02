@@ -1003,12 +1003,18 @@ class _BuildImage extends State<BuildImage> {
     if (gitUrl != null && gitUrl.isNotEmpty) {
       String gitPassword = formKey.currentState!.value["git_password"];
       String gitUsername = formKey.currentState!.value["git_username"];
+      String gitRef = formKey.currentState!.value["git_ref"];
+      String gitPath = formKey.currentState!.value["git_path"];
 
       source = BuildSourceGit(
         url: "https://$gitUrl",
         username: gitUsername == "" ? null : gitUsername,
         password: gitPassword == "" ? null : gitPassword,
+        ref: gitRef == "" ? null : gitRef,
+        path: gitPath == "" ? null : gitPath,
       );
+    } else {
+      return false;
     }
 
     /*
@@ -1167,11 +1173,16 @@ class _BuildImage extends State<BuildImage> {
                                   spacing: 16,
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    Text(
+                                      "Source",
+                                      style:
+                                          ShadTheme.of(context).textTheme.muted,
+                                    ),
                                     ShadInputFormField(
                                       id: "git_url",
                                       leading: Text("https://"),
                                       gap: 0,
-                                      label: Text("git url"),
+                                      label: Text("git repo url"),
                                       initialValue: "",
                                       validator:
                                           (value) =>
@@ -1180,21 +1191,50 @@ class _BuildImage extends State<BuildImage> {
                                                   : null,
                                     ),
 
+                                    Text(
+                                      "Optional Configuration Options",
+                                      style:
+                                          ShadTheme.of(context).textTheme.muted,
+                                    ),
+
+                                    Row(
+                                      spacing: 8,
+                                      children: [
+                                        Expanded(
+                                          child: ShadInputFormField(
+                                            id: "git_username",
+                                            label: Text("username"),
+                                            initialValue: "",
+                                          ),
+                                        ),
+
+                                        Expanded(
+                                          child: ShadInputFormField(
+                                            id: "git_password",
+                                            label: Text("password"),
+                                            obscureText: true,
+                                            initialValue: "",
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+
                                     ShadInputFormField(
-                                      id: "git_username",
-                                      label: Text("git username"),
+                                      id: "git_ref",
+                                      label: Text("branch or ref"),
+                                      obscureText: true,
                                       initialValue: "",
                                     ),
 
                                     ShadInputFormField(
-                                      id: "git_password",
-                                      label: Text("git password"),
+                                      id: "git_path",
+                                      label: Text("path"),
                                       obscureText: true,
                                       initialValue: "",
                                     ),
 
                                     Text(
-                                      "registry credentials",
+                                      "docker credentials (for pulling base images)",
                                       style:
                                           ShadTheme.of(context).textTheme.small,
                                     ),
