@@ -630,11 +630,12 @@ class _ConfigureServiceTemplateDialog
           children: [
             const SizedBox(height: 16),
             Text(
-              widget.spec.name,
+              widget.spec.metadata.name,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 4),
-            if (widget.spec.description != null) Text(widget.spec.description!),
+            if (widget.spec.metadata.description != null)
+              Text(widget.spec.metadata.description!),
             const SizedBox(height: 16),
             // ── Variable inputs ─────────────────────────────────────────────
             if (hasVars)
