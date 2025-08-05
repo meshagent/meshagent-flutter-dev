@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 enum ProjectRole { member, admin }
@@ -216,6 +217,52 @@ abstract class AccountsClient {
     }
 
     return jsonDecode(response.body)["id"];
+  }
+
+  /// Corresponds to: POST /accounts/projects/:project_id/services
+  /// Body: { "name", "image", "pull_secret", "runtime_secrets", "environment_secrets", "environment" : \<settings\> }
+  /// Returns JSON like { "id" } on success.
+  Future<void> upload({
+    required String projectId,
+    required String path,
+    required Uint8List data,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/upload',
+    ).replace(queryParameters: {"path": path});
+
+    final response = await http.post(uri, headers: _getHeaders(), body: data);
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to create share. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+  }
+
+  /// Corresponds to: POST /accounts/projects/:project_id/services
+  /// Body: { "name", "image", "pull_secret", "runtime_secrets", "environment_secrets", "environment" : \<settings\> }
+  /// Returns JSON like { "id" } on success.
+  Future<Uint8List> download({
+    required String projectId,
+    required String path,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/download',
+    ).replace(queryParameters: {"path": path});
+    ;
+
+    final response = await http.get(uri, headers: _getHeaders());
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to create share. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+
+    return response.bodyBytes;
   }
 
   /// Corresponds to: POST /accounts/projects/:project_id/services
