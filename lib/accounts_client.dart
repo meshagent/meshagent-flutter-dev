@@ -219,16 +219,14 @@ abstract class AccountsClient {
     return jsonDecode(response.body)["id"];
   }
 
-  /// Corresponds to: POST /accounts/projects/:project_id/services
-  /// Body: { "name", "image", "pull_secret", "runtime_secrets", "environment_secrets", "environment" : \<settings\> }
-  /// Returns JSON like { "id" } on success.
+  /// Corresponds to: POST /accounts/projects/:project_id/storage/upload
   Future<void> upload({
     required String projectId,
     required String path,
     required Uint8List data,
   }) async {
     final uri = Uri.parse(
-      '$baseUrl/accounts/projects/$projectId/upload',
+      '$baseUrl/projects/$projectId/storage/upload',
     ).replace(queryParameters: {"path": path});
 
     final response = await http.post(uri, headers: _getHeaders(), body: data);
@@ -241,20 +239,21 @@ abstract class AccountsClient {
     }
   }
 
-  /// Corresponds to: POST /accounts/projects/:project_id/services
-  /// Body: { "name", "image", "pull_secret", "runtime_secrets", "environment_secrets", "environment" : \<settings\> }
-  /// Returns JSON like { "id" } on success.
+  /// Corresponds to: POST /accounts/projects/:project_id/storage/download
   Future<Uint8List> download({
     required String projectId,
     required String path,
   }) async {
     final uri = Uri.parse(
-      '$baseUrl/accounts/projects/$projectId/download',
+      '$baseUrl/projects/$projectId/storage/download',
     ).replace(queryParameters: {"path": path});
     ;
 
     final response = await http.get(uri, headers: _getHeaders());
 
+    if (response.statusCode == 404) {
+      throw NotFoundException("file was not found");
+    }
     if (response.statusCode >= 400) {
       throw AccountsClientException(
         'Failed to create share. '
@@ -265,7 +264,7 @@ abstract class AccountsClient {
     return response.bodyBytes;
   }
 
-  /// Corresponds to: POST /accounts/projects/:project_id/services
+  /// Corresponds to: POST /accounts/projects/:project_id/
   /// Body: { "environment" : \<settings\> }
   /// Returns JSON like { "id" } on success.
   Future<void> updateService({
@@ -1231,6 +1230,10 @@ class AccountsClientException implements Exception {
 
   @override
   String toString() => 'HttpException: $message';
+}
+
+class NotFoundException extends AccountsClientException {
+  NotFoundException(super.message);
 }
 
 class Endpoint {
