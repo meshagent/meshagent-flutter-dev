@@ -219,7 +219,7 @@ abstract class AccountsClient {
     return jsonDecode(response.body)["id"];
   }
 
-  /// Corresponds to: POST /accounts/projects/:project_id/storage/upload
+  /// Corresponds to: POST /projects/:project_id/storage/upload
   Future<void> upload({
     required String projectId,
     required String path,
@@ -239,7 +239,7 @@ abstract class AccountsClient {
     }
   }
 
-  /// Corresponds to: POST /accounts/projects/:project_id/storage/download
+  /// Corresponds to: POST /projects/:project_id/storage/download
   Future<Uint8List> download({
     required String projectId,
     required String path,

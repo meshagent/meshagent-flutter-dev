@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:meshagent/meshagent.dart';
-import 'package:meshagent_flutter_dev/accounts_client.dart';
 import 'package:meshagent_flutter_dev/terminal.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
@@ -865,7 +864,7 @@ class _ContainerLogStream extends State<ContainerLogStream> {
   @override
   Widget build(BuildContext context) {
     final inProgress =
-        progress!.entries
+        progress.entries
             .where(
               (entry) =>
                   entry.value.current != null && entry.value.total != null,
@@ -1048,21 +1047,20 @@ class _BuildImage extends State<BuildImage> {
     final image = formKey.currentState!.value["git_url"];
 
     try {
-      if (source != null) {
-        // final buildLogs = widget.room.containers.build(tag: image, source: BuildSourceContext(context: Uint8List.fromList(data)));
-        //final buildLogs = widget.room.containers.build(tag: image, source: BuildSourceRoom(path: "/sample"));
-        final buildLogs = widget.room.containers.build(
-          tag: image,
-          source: source,
-          credentials: currentCredentials,
-        );
-        if (!mounted) return false;
-        setState(() {
-          logs = buildLogs;
-        });
+      // final buildLogs = widget.room.containers.build(tag: image, source: BuildSourceContext(context: Uint8List.fromList(data)));
+      //final buildLogs = widget.room.containers.build(tag: image, source: BuildSourceRoom(path: "/sample"));
+      final buildLogs = widget.room.containers.build(
+        tag: image,
+        source: source,
+        credentials: currentCredentials,
+      );
+      if (!mounted) return false;
+      setState(() {
+        logs = buildLogs;
+      });
 
-        await buildLogs.result;
-      }
+      await buildLogs.result;
+
       return true;
     } catch (ex) {
       if (mounted) {
