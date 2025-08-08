@@ -110,7 +110,7 @@ class _ImageTableState extends State<ImageTable> {
                                 variables: vars,
                               );
                             } else {
-                              final tty = widget.client.containers.tty(
+                              final tty = widget.client.containers.runAttached(
                                 image:
                                     img.tags.isNotEmpty
                                         ? img.tags.first

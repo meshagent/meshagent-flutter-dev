@@ -129,7 +129,7 @@ class _RoomTerminal extends State<RoomTerminal> {
 class ContainerTerminal extends StatefulWidget {
   const ContainerTerminal({super.key, required this.tty});
 
-  final ContainerTTY tty;
+  final ContainerRun tty;
 
   @override
   State createState() => _ContainerTerminal();
@@ -160,8 +160,7 @@ class _ContainerTerminal extends State<ContainerTerminal> {
   }
 
   void watch() {
-    subStderr = widget.tty.stderr.listen(onData);
-    subStdout = widget.tty.stdout.listen(onData);
+    subStdout = widget.tty.output.listen(onData);
   }
 
   void onData(data) {
