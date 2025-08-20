@@ -96,6 +96,13 @@ abstract class AccountsClient {
       body: jsonEncode(body),
     );
 
+    if (response.statusCode == 409) {
+      throw AccountsClientException(
+        'Failed to create mailbox. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+
     if (response.statusCode >= 400) {
       throw AccountsClientException(
         'Failed to create mailbox. '
