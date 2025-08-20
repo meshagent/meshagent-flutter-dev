@@ -36,6 +36,26 @@ class Transaction {
   final DateTime createdAt;
 }
 
+class Mailbox {
+  final String address;
+  final String room;
+  final String queue;
+
+  Mailbox({required this.address, required this.room, required this.queue});
+
+  factory Mailbox.fromJson(Map<String, dynamic> json) => Mailbox(
+    address: json['address'] as String,
+    room: json['room'] as String,
+    queue: json['queue'] as String,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'address': address,
+    'room': room,
+    'queue': queue,
+  };
+}
+
 /// A client to interact with the accounts routes.
 abstract class AccountsClient {
   final String baseUrl;
@@ -56,6 +76,103 @@ abstract class AccountsClient {
       'Authorization': 'Bearer $token',
       'Content-Type': 'application/json',
     };
+  }
+
+  /// POST /accounts/projects/{project_id}/mailboxes
+  /// Body: { "address", "room", "queue" }
+  /// Returns {} on success.
+  Future<void> createMailbox({
+    required String projectId,
+    required String address,
+    required String room,
+    required String queue,
+  }) async {
+    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/mailboxes');
+    final body = {'address': address, 'room': room, 'queue': queue};
+
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to create mailbox. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+  }
+
+  /// PUT /accounts/projects/{project_id}/mailboxes/{address}
+  /// Body: { "room", "queue" }
+  /// Returns {} on success.
+  Future<void> updateMailbox({
+    required String projectId,
+    required String address,
+    required String room,
+    required String queue,
+  }) async {
+    final encodedAddress = Uri.encodeComponent(address);
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/mailboxes/$encodedAddress',
+    );
+    final body = {'room': room, 'queue': queue};
+
+    final response = await http.put(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to update mailbox. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+  }
+
+  /// GET /accounts/projects/{project_id}/mailboxes
+  /// Returns { "mailboxes": [ { "address","room","queue" }, ... ] }
+  Future<List<Mailbox>> listMailboxes(String projectId) async {
+    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/mailboxes');
+    final response = await http.get(uri, headers: _getHeaders());
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to list mailboxes. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final list = data['mailboxes'] as List<dynamic>? ?? [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(Mailbox.fromJson)
+        .toList();
+  }
+
+  /// DELETE /accounts/projects/{project_id}/mailboxes/{address}
+  /// Returns {} on success.
+  Future<void> deleteMailbox({
+    required String projectId,
+    required String address,
+  }) async {
+    final encodedAddress = Uri.encodeComponent(address);
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/mailboxes/$encodedAddress',
+    );
+
+    final response = await http.delete(uri, headers: _getHeaders());
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to delete mailbox. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
   }
 
   /// Corresponds to: POST /accounts/projects/{project_id}/secrets
