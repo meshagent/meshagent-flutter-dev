@@ -764,15 +764,16 @@ abstract class AccountsClient {
   /// Corresponds to: POST /accounts/projects/:project_id/users/:user_id
   /// Body: { "is_admin" }
   /// Returns JSON like { "ok": true } on success.
-  Future<void> setUserIsAdmin(
-    String projectId,
-    String userId,
-    bool isAdmin,
-  ) async {
+  Future<void> updateUser({
+    required String projectId,
+    required String userId,
+    required bool isAdmin,
+    required bool isDeveloper,
+  }) async {
     final uri = Uri.parse(
       '$baseUrl/accounts/projects/$projectId/users/$userId',
     );
-    final body = {'is_admin': isAdmin};
+    final body = {'is_admin': isAdmin, "is_developer": isDeveloper};
 
     final response = await http.put(
       uri,
