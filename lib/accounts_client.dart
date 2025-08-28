@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:meshagent/participant_token.dart';
 
-enum ProjectRole { member, admin }
+enum ProjectRole { member, developer, admin }
 
 class Balance {
   Balance({
@@ -923,6 +923,7 @@ abstract class AccountsClient {
 
     return switch (role) {
       "admin" => ProjectRole.admin,
+      "developer" => ProjectRole.developer,
       _ => ProjectRole.member,
     };
   }
