@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:meshagent/participant_token.dart';
 
 enum ProjectRole { member, admin }
 
@@ -1345,6 +1346,414 @@ abstract class AccountsClient {
     // 200 or 204 on success, no body to parse
     return;
   }
+
+  // -------------------------------
+  // Room Grant methods
+  // -------------------------------
+
+  /// POST /accounts/projects/{project_id}/room-grants
+  /// Body: { "room_name", "user_id", "permissions" }
+  /// Returns {} on success.
+  Future<void> createRoomGrant({
+    required String projectId,
+    required String roomName,
+    required String userId,
+    required ApiScope permissions,
+  }) async {
+    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/room-grants');
+    final body = {
+      'room_name': roomName,
+      'user_id': userId,
+      'permissions': permissions.toJson(),
+    };
+
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to create room grant. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+  }
+
+  /// POST /accounts/projects/{project_id}/room-grants
+  /// Body: { "room_name", "user_id", "permissions" }
+  /// Returns {} on success.
+  Future<void> createRoomGrantByEmail({
+    required String projectId,
+    required String roomName,
+    required String email,
+    required ApiScope permissions,
+  }) async {
+    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/room-grants');
+    final body = {
+      'room_name': roomName,
+      'email': email,
+      'permissions': permissions.toJson(),
+    };
+
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to create room grant. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+  }
+
+  /// PUT /accounts/projects/{project_id}/room-grants/{grant_id}
+  /// Body: { "room_name", "user_id", "permissions" }
+  /// Note: Many servers ignore {grant_id} and update by (project_id, room_name, user_id).
+  Future<void> updateRoomGrant({
+    required String projectId,
+    required String roomName,
+    required String userId,
+    required ApiScope permissions,
+    String? grantId,
+  }) async {
+    final gid = grantId ?? 'unused';
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/room-grants/$gid',
+    );
+
+    final body = {
+      'room_name': roomName,
+      'user_id': userId,
+      'permissions': permissions.toJson(),
+    };
+
+    final response = await http.put(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to update room grant. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+  }
+
+  /// DELETE /accounts/projects/{project_id}/room-grants/{room_name}/{user_id}
+  /// Returns {} on success.
+  Future<void> deleteRoomGrant({
+    required String projectId,
+    required String roomName,
+    required String userId,
+  }) async {
+    final r = Uri.encodeComponent(roomName);
+    final u = Uri.encodeComponent(userId);
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/room-grants/$r/$u',
+    );
+
+    final response = await http.delete(uri, headers: _getHeaders());
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to delete room grant. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+  }
+
+  /// GET /accounts/projects/{project_id}/room-grants/{room_name}/{user_id}
+  /// Returns a ProjectRoomGrant.
+  Future<ProjectRoomGrant> getRoomGrant({
+    required String projectId,
+    required String roomName,
+    required String userId,
+  }) async {
+    final r = Uri.encodeComponent(roomName);
+    final u = Uri.encodeComponent(userId);
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/room-grants/$r/$u',
+    );
+
+    final response = await http.get(uri, headers: _getHeaders());
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to get room grant. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return ProjectRoomGrant.fromJson(data);
+  }
+
+  /// GET /accounts/projects/{project_id}/room-grants?limit=&offset=&order_by=
+  /// Returns List<ProjectRoomGrant>.
+  Future<List<ProjectRoomGrant>> listRoomGrants(
+    String projectId, {
+    int limit = 50,
+    int offset = 0,
+    String orderBy = 'room_name',
+  }) async {
+    var uri = Uri.parse('$baseUrl/accounts/projects/$projectId/room-grants');
+    uri = uri.replace(
+      queryParameters: {
+        'limit': '$limit',
+        'offset': '$offset',
+        'order_by': orderBy,
+      },
+    );
+
+    final response = await http.get(uri, headers: _getHeaders());
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to list room grants. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final list = data['room_grants'] as List<dynamic>? ?? [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(ProjectRoomGrant.fromJson)
+        .toList();
+  }
+
+  /// GET /accounts/projects/{project_id}/room-grants/by-user/{user_id}?limit=&offset=&order_by=
+  /// Returns List<ProjectRoomGrant>.
+  Future<List<ProjectRoomGrant>> listRoomGrantsByUser(
+    String projectId,
+    String userId, {
+    int limit = 50,
+    int offset = 0,
+    String orderBy = 'room_name',
+  }) async {
+    final u = Uri.encodeComponent(userId);
+    var uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/room-grants/by-user/$u',
+    ).replace(
+      queryParameters: {
+        'limit': '$limit',
+        'offset': '$offset',
+        'order_by': orderBy,
+      },
+    );
+
+    final response = await http.get(uri, headers: _getHeaders());
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to list room grants by user. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final list = data['room_grants'] as List<dynamic>? ?? [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(ProjectRoomGrant.fromJson)
+        .toList();
+  }
+
+  /// GET /accounts/projects/{project_id}/room-grants/by-room/{room_name}?limit=&offset=&order_by=
+  /// Returns List<ProjectRoomGrant>.
+  Future<List<ProjectRoomGrant>> listRoomGrantsByRoom(
+    String projectId,
+    String roomName, {
+    int limit = 50,
+    int offset = 0,
+    String orderBy = 'user_id',
+  }) async {
+    final r = Uri.encodeComponent(roomName);
+    var uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/room-grants/by-room/$r',
+    ).replace(
+      queryParameters: {
+        'limit': '$limit',
+        'offset': '$offset',
+        'order_by': orderBy,
+      },
+    );
+
+    final response = await http.get(uri, headers: _getHeaders());
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to list room grants by room. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final list = data['room_grants'] as List<dynamic>? ?? [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(ProjectRoomGrant.fromJson)
+        .toList();
+  }
+
+  /// GET /accounts/projects/{project_id}/room-grants/by-room?limit=&offset=
+  /// Returns List<ProjectRoomGrantCount>.
+  Future<List<ProjectRoomGrantCount>> listUniqueRoomsWithGrants(
+    String projectId, {
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    var uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/room-grants/by-room',
+    ).replace(queryParameters: {'limit': '$limit', 'offset': '$offset'});
+
+    final response = await http.get(uri, headers: _getHeaders());
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to list unique rooms with grants. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final list = data['rooms'] as List<dynamic>? ?? [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(ProjectRoomGrantCount.fromJson)
+        .toList();
+  }
+
+  /// GET /accounts/projects/{project_id}/room-grants/by-user?limit=&offset=
+  /// Returns List<ProjectUserGrantCount>.
+  Future<List<ProjectUserGrantCount>> listUniqueUsersWithGrants(
+    String projectId, {
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    var uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/room-grants/by-user',
+    ).replace(queryParameters: {'limit': '$limit', 'offset': '$offset'});
+
+    final response = await http.get(uri, headers: _getHeaders());
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to list unique users with grants. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final list = data['users'] as List<dynamic>? ?? [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(ProjectUserGrantCount.fromJson)
+        .toList();
+  }
+}
+
+class ProjectRoomGrant {
+  final String room; // room name
+  final String userId;
+  final ApiScope permissions;
+
+  ProjectRoomGrant({
+    required this.room,
+    required this.userId,
+    required this.permissions,
+  });
+
+  factory ProjectRoomGrant.fromJson(Map<String, dynamic> json) {
+    final roomName = (json['room'] ?? json['room_name']) as String;
+    return ProjectRoomGrant(
+      room: roomName,
+      userId: json['user_id'] as String,
+      permissions: ApiScope.fromJson(
+        json['permissions'] as Map<String, dynamic>,
+      ),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'room': room,
+    'user_id': userId,
+    'permissions': permissions,
+  };
+}
+
+class ProjectRoomGrantCount {
+  final String room;
+  final int count;
+
+  ProjectRoomGrantCount({required this.room, required this.count});
+
+  factory ProjectRoomGrantCount.fromJson(Map<String, dynamic> json) {
+    final roomName = (json['room'] ?? json['room_name']) as String;
+    final dynamic c = json['count'];
+    final int parsedCount =
+        c is int
+            ? c
+            : c is num
+            ? c.toInt()
+            : c is String
+            ? int.tryParse(c) ?? 0
+            : 0;
+    return ProjectRoomGrantCount(room: roomName, count: parsedCount);
+  }
+
+  Map<String, dynamic> toJson() => {'room': room, 'count': count};
+}
+
+class ProjectUserGrantCount {
+  final String userId;
+  final int count;
+  final String? firstName;
+  final String? lastName;
+  final String email;
+
+  ProjectUserGrantCount({
+    required this.userId,
+    required this.count,
+    this.firstName,
+    this.lastName,
+    required this.email,
+  });
+
+  factory ProjectUserGrantCount.fromJson(Map<String, dynamic> json) {
+    final dynamic c = json['count'];
+    final int parsedCount =
+        c is int
+            ? c
+            : c is num
+            ? c.toInt()
+            : c is String
+            ? int.tryParse(c) ?? 0
+            : 0;
+
+    return ProjectUserGrantCount(
+      userId: json['user_id'] as String,
+      count: parsedCount,
+      firstName: json['first_name'] as String?,
+      lastName: json['last_name'] as String?,
+      email: (json['email'] ?? '') as String,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'user_id': userId,
+    'count': count,
+    if (firstName != null) 'first_name': firstName,
+    if (lastName != null) 'last_name': lastName,
+    'email': email,
+  };
 }
 
 /// A simple custom exception to denote HTTP errors.
