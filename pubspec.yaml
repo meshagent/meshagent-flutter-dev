@@ -33,7 +33,7 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
-  shadcn_ui: ^0.27.0
+  shadcn_ui: ^0.28.7
   lucide_icons_flutter: ^3.0.0
   google_fonts: ^6.2.1
   super_sliver_list: ^0.4.1
