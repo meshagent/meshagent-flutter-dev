@@ -1531,9 +1531,9 @@ abstract class AccountsClient {
 
   /// GET /accounts/projects/{project_id}/room-grants/by-user/{user_id}?limit=&offset=&order_by=
   /// Returns List<ProjectRoomGrant>.
-  Future<List<ProjectRoomGrant>> listRoomGrantsByUser(
-    String projectId,
-    String userId, {
+  Future<List<ProjectRoomGrant>> listRoomGrantsByUser({
+    required String projectId,
+    required String userId,
     int limit = 50,
     int offset = 0,
     String orderBy = 'room_name',
@@ -1568,9 +1568,9 @@ abstract class AccountsClient {
 
   /// GET /accounts/projects/{project_id}/room-grants/by-room/{room_name}?limit=&offset=&order_by=
   /// Returns List<ProjectRoomGrant>.
-  Future<List<ProjectRoomGrant>> listRoomGrantsByRoom(
-    String projectId,
-    String roomName, {
+  Future<List<ProjectRoomGrant>> listRoomGrantsByRoom({
+    required String projectId,
+    required String roomName,
     int limit = 50,
     int offset = 0,
     String orderBy = 'user_id',
@@ -1605,8 +1605,8 @@ abstract class AccountsClient {
 
   /// GET /accounts/projects/{project_id}/room-grants/by-room?limit=&offset=
   /// Returns List<ProjectRoomGrantCount>.
-  Future<List<ProjectRoomGrantCount>> listUniqueRoomsWithGrants(
-    String projectId, {
+  Future<List<ProjectRoomGrantCount>> listUniqueRoomsWithGrants({
+    required String projectId,
     int limit = 50,
     int offset = 0,
   }) async {
@@ -1633,8 +1633,8 @@ abstract class AccountsClient {
 
   /// GET /accounts/projects/{project_id}/room-grants/by-user?limit=&offset=
   /// Returns List<ProjectUserGrantCount>.
-  Future<List<ProjectUserGrantCount>> listUniqueUsersWithGrants(
-    String projectId, {
+  Future<List<ProjectUserGrantCount>> listUniqueUsersWithGrants({
+    required String projectId,
     int limit = 50,
     int offset = 0,
   }) async {
