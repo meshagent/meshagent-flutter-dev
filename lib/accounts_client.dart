@@ -1358,13 +1358,13 @@ abstract class AccountsClient {
   /// Returns {} on success.
   Future<void> createRoomGrant({
     required String projectId,
-    required String roomName,
+    required String roomId,
     required String userId,
     required ApiScope permissions,
   }) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/room-grants');
     final body = {
-      'room_name': roomName,
+      'room_id': roomId,
       'user_id': userId,
       'permissions': permissions.toJson(),
     };
@@ -1388,13 +1388,13 @@ abstract class AccountsClient {
   /// Returns {} on success.
   Future<void> createRoomGrantByEmail({
     required String projectId,
-    required String roomName,
+    required String roomId,
     required String email,
     required ApiScope permissions,
   }) async {
     final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/room-grants');
     final body = {
-      'room_name': roomName,
+      'room_id': roomId,
       'email': email,
       'permissions': permissions.toJson(),
     };
@@ -1418,7 +1418,7 @@ abstract class AccountsClient {
   /// Note: Many servers ignore {grant_id} and update by (project_id, room_name, user_id).
   Future<void> updateRoomGrant({
     required String projectId,
-    required String roomName,
+    required String roomId,
     required String userId,
     required ApiScope permissions,
     String? grantId,
@@ -1429,7 +1429,7 @@ abstract class AccountsClient {
     );
 
     final body = {
-      'room_name': roomName,
+      'room_id': roomId,
       'user_id': userId,
       'permissions': permissions.toJson(),
     };
@@ -1452,10 +1452,10 @@ abstract class AccountsClient {
   /// Returns {} on success.
   Future<void> deleteRoomGrant({
     required String projectId,
-    required String roomName,
+    required String roomId,
     required String userId,
   }) async {
-    final r = Uri.encodeComponent(roomName);
+    final r = Uri.encodeComponent(roomId);
     final u = Uri.encodeComponent(userId);
     final uri = Uri.parse(
       '$baseUrl/accounts/projects/$projectId/room-grants/$r/$u',
@@ -1475,10 +1475,10 @@ abstract class AccountsClient {
   /// Returns a ProjectRoomGrant.
   Future<ProjectRoomGrant> getRoomGrant({
     required String projectId,
-    required String roomName,
+    required String roomId,
     required String userId,
   }) async {
-    final r = Uri.encodeComponent(roomName);
+    final r = Uri.encodeComponent(roomId);
     final u = Uri.encodeComponent(userId);
     final uri = Uri.parse(
       '$baseUrl/accounts/projects/$projectId/room-grants/$r/$u',
@@ -1660,10 +1660,182 @@ abstract class AccountsClient {
         .map(ProjectUserGrantCount.fromJson)
         .toList();
   }
+
+  /// --------------------------------
+  /// Rooms
+  /// --------------------------------
+
+  /// POST /accounts/projects/{project_id}/rooms
+  /// Body: { "name": "<name>", "if_not_exists": bool }
+  /// Returns a Room on success.
+  Future<Room> createRoom({
+    required String projectId,
+    required String name,
+    bool ifNotExists = false,
+  }) async {
+    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/rooms');
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode({'name': name, 'if_not_exists': ifNotExists}),
+    );
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to create room. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+
+    return Room.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  /// GET /accounts/projects/{project_id}/rooms/{room_name}
+  /// Returns a Room (404 -> NotFoundException).
+  Future<Room> getRoom({
+    required String projectId,
+    required String name,
+  }) async {
+    final r = Uri.encodeComponent(name);
+    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/rooms/$r');
+
+    final response = await http.get(uri, headers: _getHeaders());
+
+    if (response.statusCode == 404) {
+      throw NotFoundException('room not found');
+    }
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to get room. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+
+    return Room.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  /// PUT /accounts/projects/{project_id}/rooms/{room_id}
+  /// Body: { "name": "<new name>" }
+  Future<void> updateRoom({
+    required String projectId,
+    required String roomId,
+    required String name,
+  }) async {
+    final rid = Uri.encodeComponent(roomId);
+    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/rooms/$rid');
+
+    final response = await http.put(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode({'name': name}),
+    );
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to update room. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+  }
+
+  /// DELETE /accounts/projects/{project_id}/rooms/{room_id}
+  Future<void> deleteRoom({
+    required String projectId,
+    required String roomId,
+  }) async {
+    final rid = Uri.encodeComponent(roomId);
+    final uri = Uri.parse('$baseUrl/accounts/projects/$projectId/rooms/$rid');
+
+    final response = await http.delete(uri, headers: _getHeaders());
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to delete room. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+  }
+
+  /// POST /accounts/projects/{project_id}/rooms/{room_name}/connect
+  /// Body: {}
+  /// Returns { "jwt", "room_name", "project_id", "room_url" } on success.
+  Future<Map<String, dynamic>> connectRoom({
+    required String projectId,
+    required String name,
+  }) async {
+    final r = Uri.encodeComponent(name);
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/rooms/$r/connect',
+    );
+
+    final response = await http.post(
+      uri,
+      headers: _getHeaders(),
+      body: jsonEncode({}),
+    );
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to connect room. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  /// --------------------------------
+  /// Services (single fetch)
+  /// --------------------------------
+
+  /// GET /accounts/projects/{project_id}/services/{service_id}
+  /// Returns a single Service.
+  ///
+  /// Note: Some servers may return the JSON as a string payload.
+  /// This method handles both a Map response and a stringified JSON.
+  Future<Service> getService({
+    required String projectId,
+    required String serviceId,
+  }) async {
+    final sid = Uri.encodeComponent(serviceId);
+    final uri = Uri.parse(
+      '$baseUrl/accounts/projects/$projectId/services/$sid',
+    );
+
+    final response = await http.get(uri, headers: _getHeaders());
+
+    if (response.statusCode >= 400) {
+      throw AccountsClientException(
+        'Failed to get service. '
+        'Status code: ${response.statusCode}, body: ${response.body}',
+      );
+    }
+
+    final decoded = jsonDecode(response.body);
+    final Map<String, dynamic> json =
+        decoded is String
+            ? jsonDecode(decoded) as Map<String, dynamic>
+            : decoded as Map<String, dynamic>;
+
+    return Service.fromJson(json);
+  }
+}
+
+class Room {
+  const Room({required this.name, required this.id});
+
+  final String name;
+  final String id;
+
+  static Room fromJson(Map<String, dynamic> json) {
+    return Room(id: json["id"], name: json["name"]);
+  }
+
+  Map<String, dynamic> toJson() => {"name": name, "id": id};
 }
 
 class ProjectRoomGrant {
-  final String room; // room name
+  final Room room; // room name
   final String userId;
   final ApiScope permissions;
 
@@ -1674,9 +1846,8 @@ class ProjectRoomGrant {
   });
 
   factory ProjectRoomGrant.fromJson(Map<String, dynamic> json) {
-    final roomName = (json['room'] ?? json['room_name']) as String;
     return ProjectRoomGrant(
-      room: roomName,
+      room: Room.fromJson(json['room']),
       userId: json['user_id'] as String,
       permissions: ApiScope.fromJson(
         json['permissions'] as Map<String, dynamic>,
@@ -1685,20 +1856,19 @@ class ProjectRoomGrant {
   }
 
   Map<String, dynamic> toJson() => {
-    'room': room,
+    'room': room.toJson(),
     'user_id': userId,
     'permissions': permissions,
   };
 }
 
 class ProjectRoomGrantCount {
-  final String room;
+  final Room room;
   final int count;
 
   ProjectRoomGrantCount({required this.room, required this.count});
 
   factory ProjectRoomGrantCount.fromJson(Map<String, dynamic> json) {
-    final roomName = (json['room'] ?? json['room_name']) as String;
     final dynamic c = json['count'];
     final int parsedCount =
         c is int
@@ -1708,7 +1878,10 @@ class ProjectRoomGrantCount {
             : c is String
             ? int.tryParse(c) ?? 0
             : 0;
-    return ProjectRoomGrantCount(room: roomName, count: parsedCount);
+    return ProjectRoomGrantCount(
+      room: Room.fromJson(json['room']),
+      count: parsedCount,
+    );
   }
 
   Map<String, dynamic> toJson() => {'room': room, 'count': count};
