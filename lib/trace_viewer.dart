@@ -13,6 +13,8 @@ import './ansi.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
+import 'package:intl/intl.dart';
+
 dynamic trimStrings(dynamic v) {
   if (v is String) {
     if (v.length > 128) {
@@ -332,10 +334,10 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
                                                   ).textTheme.muted,
                                             ),
                                             Text(
-                                              "Started: ${DateTime.fromMicrosecondsSinceEpoch((node.startTimeUnixNano / 1000).toInt())}",
+                                              "Started: ${DateFormat.yMMMMEEEEd().add_jm().format(DateTime.fromMicrosecondsSinceEpoch((node.startTimeUnixNano / 1000).toInt(), isUtc: true).toLocal())}",
                                             ),
                                             Text(
-                                              "Ended: ${DateTime.fromMicrosecondsSinceEpoch((node.startTimeUnixNano / 1000).toInt())}",
+                                              "Ended: ${DateFormat.yMMMMEEEEd().add_jm().format(DateTime.fromMicrosecondsSinceEpoch((node.startTimeUnixNano / 1000).toInt(), isUtc: true).toLocal())}",
                                             ),
                                             Text("Duration: ${duration}s"),
                                           ],
@@ -448,35 +450,87 @@ class _LiveLogViewer extends State<LiveLogViewer> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  MouseRegion(
+                  ShadGestureDetector(
                     cursor: SystemMouseCursors.click,
-                    child: ShadTooltip(
-                      builder: (context) {
-                        return DefaultTextStyle(
-                          style: ShadTheme.of(context).textTheme.p,
-                          textAlign: TextAlign.left,
-                          child: Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                for (final attribute in m.attributes)
-                                  Text(
-                                    "${attribute.key}: ${attribute.value}",
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                              ],
+                    onTap: () {
+                      showShadSheet(
+                        side: ShadSheetSide.right,
+                        context: context,
+                        builder:
+                            (context) => ShadSheet(
+                              title: Text("Log Details"),
+                              constraints: BoxConstraints(
+                                minWidth: 500,
+                                maxWidth: 500,
+                              ),
+                              child: SelectionArea(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text.rich(
+                                      TextSpan(
+                                        children: [
+                                          TextSpan(
+                                            text: "timestamp: ",
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          TextSpan(
+                                            text: DateFormat.yMMMMEEEEd()
+                                                .add_jm()
+                                                .format(
+                                                  DateTime.fromMicrosecondsSinceEpoch(
+                                                    (m.timeUnixNano / 1000)
+                                                        .toInt(),
+                                                    isUtc: true,
+                                                  ).toLocal(),
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Text.rich(
+                                      TextSpan(
+                                        children: [
+                                          TextSpan(
+                                            text: "severity: ",
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          TextSpan(text: m.severity.name),
+                                        ],
+                                      ),
+                                    ),
+
+                                    for (final attribute in m.attributes)
+                                      Text.rich(
+                                        TextSpan(
+                                          children: [
+                                            TextSpan(
+                                              text: "${attribute.key}: ",
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            TextSpan(text: attribute.value),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 3),
-                        child: Icon(LucideIcons.chevronRight),
-                      ),
+                      );
+                    },
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 3),
+                      child: Icon(LucideIcons.chevronRight),
                     ),
                   ),
+
                   SizedBox(width: 6),
                   Expanded(
                     child: Text.rich(
