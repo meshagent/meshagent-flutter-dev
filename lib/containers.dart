@@ -7,6 +7,7 @@ import 'package:meshagent/meshagent.dart';
 import 'package:meshagent_flutter_dev/terminal.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
+import 'package:flutter_solidart/flutter_solidart.dart';
 
 class ImageTable extends StatefulWidget {
   const ImageTable({super.key, required this.client});
@@ -263,25 +264,18 @@ class ContainerTable extends StatefulWidget {
 }
 
 class _ContainerTableState extends State<ContainerTable> {
-  late Future<List<RoomContainer>> _containersFuture;
-
   @override
   void initState() {
     super.initState();
     _timer = Timer.periodic(Duration(seconds: 1), _onTick);
-    _containersFuture = widget.client.containers.list();
   }
 
   late Timer _timer;
 
+  bool all = false;
+
   void _onTick(Timer t) {
-    widget.client.containers.list().then((containers) {
-      if (mounted) {
-        setState(() {
-          _containersFuture = SynchronousFuture(containers);
-        });
-      }
-    });
+    containersResource.refresh();
   }
 
   @override
@@ -290,138 +284,207 @@ class _ContainerTableState extends State<ContainerTable> {
     _timer.cancel();
   }
 
-  Future<void> _reload() async {
-    setState(() {
-      _containersFuture = widget.client.containers.list();
-    });
-  }
+  late final containersResource = Resource<List<RoomContainer>>(
+    () => widget.client.containers.list(all: all),
+  );
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<RoomContainer>>(
-      future: _containersFuture,
+    return SignalBuilder(
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (!containersResource.state.isReady) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
+        if (containersResource.state.error != null) {
+          return Center(
+            child: Text('Error: ${containersResource.state.error}'),
+          );
         }
 
-        final containers = snapshot.data!;
-        if (containers.isEmpty) {
-          return const Center(child: Text('No running containers'));
-        }
-
-        return SingleChildScrollView(
-          scrollDirection: Axis.vertical,
-          child: DataTable(
-            columns: const [
-              DataColumn(label: Text('Image')),
-              DataColumn(label: Text('Started by')),
-              DataColumn(label: Text('')), // stop‑button column
-            ],
-            rows: [
-              for (final c in containers)
-                DataRow(
-                  cells: [
-                    DataCell(
-                      Text(
-                        ((c.entrypoint != null)
-                                ? [
-                                  ...c.entrypoint!,
-                                  if (c.command != null) ...c.command!,
-                                ]
-                                : [c.image])
-                            .join(' '),
-                      ),
-                    ),
-                    DataCell(Text(c.startedBy.name)),
-                    DataCell(
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(LucideIcons.logs),
-                            tooltip: "Logs",
-                            onPressed: () {
-                              showShadDialog(
-                                context: context,
-                                builder:
-                                    (context) => ShadDialog(
-                                      constraints: BoxConstraints(
-                                        minWidth: 1024,
-                                        minHeight: 600,
-                                        maxHeight: 700,
-                                        maxWidth: 1024,
-                                      ),
-                                      title: Text("Container logs"),
-                                      child: ContainerLogs(
-                                        client: widget.client,
-                                        containerId: c.id,
-                                      ),
-                                    ),
-                              );
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(LucideIcons.circleStop),
-                            tooltip: 'Stop',
-                            onPressed: () async {
-                              final confirm =
-                                  await showShadDialog<bool>(
-                                    context: context,
-                                    builder:
-                                        (ctx) => ShadDialog(
-                                          title: const Text('Stop container?'),
-                                          child: Text(
-                                            'Container ${c.id.substring(0, 12)}',
+        return Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  ShadCheckboxFormField(
+                    initialValue: all,
+                    onChanged: (v) {
+                      all = v;
+                      containersResource.refresh();
+                    },
+                    inputLabel: Text("include stopped containers"),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child:
+                  containersResource.state.value!.isEmpty
+                      ? const Center(child: Text('No running containers'))
+                      : LayoutBuilder(
+                        builder:
+                            (context, constraints) => SingleChildScrollView(
+                              scrollDirection: Axis.vertical,
+                              child: DataTable(
+                                columns: const [
+                                  DataColumn(label: Text('Image')),
+                                  DataColumn(label: Text('Started by')),
+                                  DataColumn(
+                                    label: Text(''),
+                                  ), // stop‑button column
+                                ],
+                                rows: [
+                                  for (final c
+                                      in containersResource.state.value!)
+                                    DataRow(
+                                      cells: [
+                                        DataCell(
+                                          ConstrainedBox(
+                                            constraints: BoxConstraints(
+                                              maxWidth:
+                                                  constraints.maxWidth * .75,
+                                            ),
+                                            child: Text(
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              ((c.entrypoint != null)
+                                                      ? [
+                                                        ...c.entrypoint!,
+                                                        if (c.command != null)
+                                                          ...c.command!,
+                                                      ]
+                                                      : [c.image])
+                                                  .join(' '),
+                                            ),
                                           ),
-                                          actions: [
-                                            ShadButton.secondary(
-                                              onPressed:
-                                                  () =>
-                                                      Navigator.pop(ctx, false),
-                                              child: const Text('Cancel'),
-                                            ),
-                                            ShadButton.destructive(
-                                              onPressed:
-                                                  () =>
-                                                      Navigator.pop(ctx, true),
-                                              child: const Text('Stop'),
-                                            ),
-                                          ],
                                         ),
-                                  ) ??
-                                  false;
-                              if (!confirm) return;
+                                        DataCell(Text(c.startedBy.name)),
+                                        DataCell(
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(
+                                                  LucideIcons.logs,
+                                                ),
+                                                tooltip: "Logs",
+                                                onPressed: () {
+                                                  showShadDialog(
+                                                    context: context,
+                                                    builder:
+                                                        (context) => ShadDialog(
+                                                          constraints:
+                                                              BoxConstraints(
+                                                                minWidth: 1024,
+                                                                minHeight: 600,
+                                                                maxHeight: 700,
+                                                                maxWidth: 1024,
+                                                              ),
+                                                          title: Text(
+                                                            "Container logs",
+                                                          ),
+                                                          child: ContainerLogs(
+                                                            client:
+                                                                widget.client,
+                                                            containerId: c.id,
+                                                          ),
+                                                        ),
+                                                  );
+                                                },
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(
+                                                  LucideIcons.circleStop,
+                                                ),
+                                                tooltip: 'Stop',
+                                                onPressed: () async {
+                                                  final confirm =
+                                                      await showShadDialog<
+                                                        bool
+                                                      >(
+                                                        context: context,
+                                                        builder:
+                                                            (ctx) => ShadDialog(
+                                                              title: const Text(
+                                                                'Stop container?',
+                                                              ),
+                                                              child: Text(
+                                                                'Container ${c.id.substring(0, 12)}',
+                                                              ),
+                                                              actions: [
+                                                                ShadButton.secondary(
+                                                                  onPressed:
+                                                                      () => Navigator.pop(
+                                                                        ctx,
+                                                                        false,
+                                                                      ),
+                                                                  child:
+                                                                      const Text(
+                                                                        'Cancel',
+                                                                      ),
+                                                                ),
+                                                                ShadButton.destructive(
+                                                                  onPressed:
+                                                                      () =>
+                                                                          Navigator.pop(
+                                                                            ctx,
+                                                                            true,
+                                                                          ),
+                                                                  child:
+                                                                      const Text(
+                                                                        'Stop',
+                                                                      ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                      ) ??
+                                                      false;
+                                                  if (!confirm) return;
 
-                              try {
-                                await widget.client.containers.stop(
-                                  containerId: c.id,
-                                );
-                                ShadToaster.of(context).show(
-                                  const ShadToast(
-                                    description: Text('Container stopped'),
-                                  ),
-                                );
-                                _reload();
-                              } catch (e) {
-                                ShadToaster.of(context).show(
-                                  ShadToast(
-                                    description: Text('Stop failed: $e'),
-                                  ),
-                                );
-                              }
-                            },
-                          ),
-                        ],
+                                                  try {
+                                                    await widget
+                                                        .client
+                                                        .containers
+                                                        .stop(
+                                                          containerId: c.id,
+                                                        );
+                                                    ShadToaster.of(
+                                                      context,
+                                                    ).show(
+                                                      const ShadToast(
+                                                        description: Text(
+                                                          'Container stopped',
+                                                        ),
+                                                      ),
+                                                    );
+                                                    containersResource
+                                                        .refresh();
+                                                  } catch (e) {
+                                                    ShadToaster.of(
+                                                      context,
+                                                    ).show(
+                                                      ShadToast(
+                                                        description: Text(
+                                                          'Stop failed: $e',
+                                                        ),
+                                                      ),
+                                                    );
+                                                  }
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                ],
+                              ),
+                            ),
                       ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
