@@ -112,6 +112,7 @@ class _ImageTableState extends State<ImageTable> {
                               );
                             } else {
                               final tty = widget.client.containers.runAttached(
+                                tty: true,
                                 image:
                                     img.tags.isNotEmpty
                                         ? img.tags.first
@@ -1292,8 +1293,7 @@ class _BuildImage extends State<BuildImage> {
                                     ShadInputFormField(
                                       id: "git_ref",
                                       label: Text("branch"),
-                                      obscureText: true,
-                                      initialValue: "",
+                                      initialValue: "main",
                                       placeholder: Text(
                                         "a branch name or reference to build from",
                                       ),
