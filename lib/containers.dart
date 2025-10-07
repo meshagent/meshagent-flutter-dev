@@ -1085,7 +1085,7 @@ class _BuildImage extends State<BuildImage> {
     Stream<TarEntry> entries = Stream.value(
       TarEntry.data(
         TarHeader(name: 'Dockerfile', mode: int.parse('644', radix: 8)),
-        utf8.encode("""FROM python:3.13-slim-bookworm
+        utf8.encode("""FROM python:3.13-slim-trixie
         ENV VIRTUAL_ENV=/src/venv
         RUN python3 -m venv \$VIRTUAL_ENV
         ENV PATH="\$VIRTUAL_ENV/bin:\$PATH"
