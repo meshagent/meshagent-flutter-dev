@@ -19,7 +19,7 @@ class ImageTable extends StatefulWidget {
 }
 
 class _ImageTableState extends State<ImageTable> {
-  late Future<List<DockerImage>> _imagesFuture;
+  late Future<List<ContainerImage>> _imagesFuture;
 
   @override
   void initState() {
@@ -55,7 +55,7 @@ class _ImageTableState extends State<ImageTable> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<DockerImage>>(
+    return FutureBuilder<List<ContainerImage>>(
       future: _imagesFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
