@@ -329,6 +329,7 @@ class _ContainerTableState extends State<ContainerTable> {
                               scrollDirection: Axis.vertical,
                               child: DataTable(
                                 columns: const [
+                                  DataColumn(label: Text('Status')),
                                   DataColumn(label: Text('Image')),
                                   DataColumn(label: Text('Started by')),
                                   DataColumn(
@@ -340,6 +341,7 @@ class _ContainerTableState extends State<ContainerTable> {
                                       in containersResource.state.value!)
                                     DataRow(
                                       cells: [
+                                        DataCell(Text(c.state)),
                                         DataCell(
                                           ConstrainedBox(
                                             constraints: BoxConstraints(
@@ -349,18 +351,27 @@ class _ContainerTableState extends State<ContainerTable> {
                                             child: Text(
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
-                                              ((c.entrypoint != null)
-                                                      ? [
-                                                        ...c.entrypoint!,
-                                                        if (c.command != null)
-                                                          ...c.command!,
-                                                      ]
-                                                      : [c.image])
-                                                  .join(' '),
+                                              [c.image].join(' '),
+                                              style: TextStyle(
+                                                color:
+                                                    c.manifest != null
+                                                        ? Colors.green
+                                                        : null,
+                                              ),
                                             ),
                                           ),
                                         ),
-                                        DataCell(Text(c.startedBy.name)),
+                                        DataCell(
+                                          Text(
+                                            c.startedBy.name,
+                                            style: TextStyle(
+                                              color:
+                                                  c.manifest != null
+                                                      ? Colors.green
+                                                      : null,
+                                            ),
+                                          ),
+                                        ),
                                         DataCell(
                                           Row(
                                             mainAxisSize: MainAxisSize.min,
