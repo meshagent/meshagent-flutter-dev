@@ -68,7 +68,6 @@ enum DeveloperConsoleView {
   terminal,
   containers,
   images,
-  builds,
 }
 
 DeveloperConsoleView view = DeveloperConsoleView.traces;
@@ -197,10 +196,6 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                       value: DeveloperConsoleView.containers,
                       child: Text("Containers"),
                     ),
-                    ShadTab(
-                      value: DeveloperConsoleView.builds,
-                      child: Text("Builds"),
-                    ),
                   ],
                 ),
               ),
@@ -258,17 +253,6 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       ShadButton.ghost(
-                        trailing: Icon(LucideIcons.bolt),
-                        onPressed: () async {
-                          await showShadDialog(
-                            context: context,
-                            builder: (context) => BuildImage(room: widget.room),
-                          );
-                        },
-                        child: Text("Build Image"),
-                      ),
-                      SizedBox(width: 10),
-                      ShadButton.ghost(
                         trailing: Icon(LucideIcons.download),
                         onPressed: () async {
                           await showShadDialog(
@@ -287,7 +271,6 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
             DeveloperConsoleView.containers => ContainerTable(
               client: widget.room,
             ),
-            DeveloperConsoleView.builds => BuildTable(client: widget.room),
           },
         ),
       ],
