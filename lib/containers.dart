@@ -4,15 +4,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:meshagent/meshagent.dart';
-import 'package:meshagent_flutter_dev/terminal.dart';
+
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:flutter_solidart/flutter_solidart.dart';
 
 class ImageTable extends StatefulWidget {
-  const ImageTable({super.key, required this.client});
+  const ImageTable({super.key, required this.client, required this.onRun});
 
   final RoomClient client;
+  final void Function(ContainerRun run) onRun;
 
   @override
   State<ImageTable> createState() => _ImageTableState();
@@ -25,13 +26,16 @@ class _ImageTableState extends State<ImageTable> {
   void initState() {
     super.initState();
     _timer = Timer.periodic(Duration(seconds: 1), _onTick);
-    _imagesFuture = widget.client.containers.listImages();
+    _imagesFuture = widget.client.containers.listImages().then(
+      (images) => images..sort((a, b) => a.tags[0].compareTo(b.tags[0])),
+    );
   }
 
   late Timer _timer;
 
   void _onTick(Timer t) {
     widget.client.containers.listImages().then((images) {
+      images.sort((a, b) => a.tags[0].compareTo(b.tags[0]));
       if (mounted) {
         setState(() {
           _imagesFuture = SynchronousFuture(images);
@@ -49,7 +53,9 @@ class _ImageTableState extends State<ImageTable> {
   /// Force a re‑query after an image is removed
   Future<void> _reload() async {
     setState(() {
-      _imagesFuture = widget.client.containers.listImages();
+      _imagesFuture = widget.client.containers.listImages().then(
+        (images) => images..sort((a, b) => a.tags[0].compareTo(b.tags[0])),
+      );
     });
   }
 
@@ -111,38 +117,29 @@ class _ImageTableState extends State<ImageTable> {
                                 variables: vars,
                               );
                             } else {
-                              final tty = widget.client.containers.runAttached(
+                              final containerId = await widget.client.containers
+                                  .run(
+                                    command: "sleep infinity",
+                                    image:
+                                        img.tags.isNotEmpty
+                                            ? img.tags.first
+                                            : img.id,
+                                    variables: vars,
+                                  );
+
+                              final tty = widget.client.containers.exec(
+                                containerId: containerId,
                                 tty: true,
                                 image:
                                     img.tags.isNotEmpty
                                         ? img.tags.first
                                         : img.id,
-                                command: "/bin/bash",
+                                command: "/bin/bash -il",
                               );
 
-                              await showShadDialog(
-                                context: context,
-                                builder: (context) {
-                                  tty.result.then((value) {
-                                    if (context.mounted) {
-                                      Navigator.of(context).pop(value);
-                                    }
-                                  });
-                                  return ShadDialog(
-                                    constraints: BoxConstraints.tight(
-                                      Size(1200, 800),
-                                    ),
-                                    title: Text("Container Terminal"),
-                                    child: SizedBox(
-                                      width: 1200,
-                                      height: 800,
-                                      child: ContainerTerminal(tty: tty),
-                                    ),
-                                  );
-                                },
-                              );
+                              if (!mounted) return;
 
-                              // TODO: kill it
+                              widget.onRun(tty);
                             }
 
                             ShadToaster.of(context).show(
@@ -171,7 +168,7 @@ class _ImageTableState extends State<ImageTable> {
                               : Icon(LucideIcons.disc),
                           SizedBox(width: 10),
                           Expanded(
-                            child: Text(
+                            child: SelectableText(
                               img.tags.isNotEmpty
                                   ? img.tags.first
                                   : '(untagged)',
@@ -286,7 +283,9 @@ class _ContainerTableState extends State<ContainerTable> {
   }
 
   late final containersResource = Resource<List<RoomContainer>>(
-    () => widget.client.containers.list(all: all),
+    () => widget.client.containers
+        .list(all: all)
+        .then((containers) => containers..sort((a, b) => a.id.compareTo(b.id))),
   );
 
   @override

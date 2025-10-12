@@ -92,6 +92,54 @@ class RoomDeveloperConsole extends StatefulWidget {
 class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
   var view = DeveloperConsoleView.logs;
 
+  ContainerRun? selectedRun;
+  final List<ContainerRun> runs = [];
+
+  void onRun(ContainerRun run) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      runs.add(run);
+      view = DeveloperConsoleView.terminal;
+      selectedRun = run;
+    });
+  }
+
+  Widget terminalView(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 300,
+          child: ListView(
+            padding: EdgeInsets.all(8),
+            children: [
+              for (final run in runs)
+                (selectedRun == run ? ShadButton.secondary : ShadButton.ghost)(
+                  onPressed: () {
+                    setState(() {
+                      selectedRun = run;
+                    });
+                  },
+                  child: Text(run.command),
+                ),
+            ],
+          ),
+        ),
+
+        Expanded(
+          child:
+              selectedRun != null
+                  ? ContainerTerminal(
+                    key: ObjectKey(selectedRun),
+                    tty: selectedRun!,
+                  )
+                  : Container(),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -198,7 +246,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                 widget.events,
               ).followedBy(widget.room.events),
             ),
-            DeveloperConsoleView.terminal => RoomTerminal(client: widget.room),
+            DeveloperConsoleView.terminal => terminalView(context),
 
             DeveloperConsoleView.images => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -233,7 +281,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                     ],
                   ),
                 ),
-                Expanded(child: ImageTable(client: widget.room)),
+                Expanded(child: ImageTable(client: widget.room, onRun: onRun)),
               ],
             ),
             DeveloperConsoleView.containers => ContainerTable(
@@ -308,7 +356,9 @@ class _LiveLogsViewerState extends State<LiveLogsViewer> {
                   border: Border(
                     bottom: BorderSide(
                       color:
-                          ShadTheme.of(context).cardTheme.border!.bottom.color,
+                          ShadTheme.of(
+                            context,
+                          ).cardTheme.border!.bottom!.color!,
                     ),
                   ),
                 ),

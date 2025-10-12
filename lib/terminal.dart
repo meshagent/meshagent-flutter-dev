@@ -145,17 +145,19 @@ class _ContainerTerminal extends State<ContainerTerminal> {
       },
       onResize: onResize,
     );
+    for (final line in widget.tty.previousOutput) {
+      final text = utf8.decode(line);
+      terminal.write(text);
+    }
 
     watch();
   }
 
-  bool connecting = true;
   bool closed = false;
 
   @override
   void dispose() {
     super.dispose();
-    subStderr.cancel();
     subStdout.cancel();
   }
 
@@ -164,18 +166,12 @@ class _ContainerTerminal extends State<ContainerTerminal> {
   }
 
   void onData(data) {
-    if (mounted) {
-      setState(() {
-        connecting = false;
-      });
-    }
     if (data is Uint8List) {
       final text = utf8.decode(data);
       terminal.write(text);
     }
   }
 
-  late final StreamSubscription subStderr;
   late final StreamSubscription subStdout;
 
   late final Terminal terminal;
@@ -192,18 +188,7 @@ class _ContainerTerminal extends State<ContainerTerminal> {
     if (closed) {
       return Center(child: Text("Terminal Session Ended"));
     }
-    if (connecting) {
-      return Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(width: 16, height: 16, child: CircularProgressIndicator()),
-            SizedBox(width: 10),
-            Text("Terminal Session Connecting..."),
-          ],
-        ),
-      );
-    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         return TerminalView(
