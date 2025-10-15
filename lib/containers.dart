@@ -461,7 +461,7 @@ class _ContainerTableState extends State<ContainerTable> {
                                                             await widget
                                                                 .client
                                                                 .containers
-                                                                .stopContainer(
+                                                                .stop(
                                                                   containerId:
                                                                       c.id,
                                                                 );
