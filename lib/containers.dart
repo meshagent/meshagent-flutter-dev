@@ -410,6 +410,91 @@ class _ContainerTableState extends State<ContainerTable> {
                                                   LucideIcons.circleStop,
                                                 ),
                                                 tooltip: 'Stop',
+                                                onPressed:
+                                                    c.state == "EXITED"
+                                                        ? null
+                                                        : () async {
+                                                          final confirm =
+                                                              await showShadDialog<
+                                                                bool
+                                                              >(
+                                                                context:
+                                                                    context,
+                                                                builder:
+                                                                    (
+                                                                      ctx,
+                                                                    ) => ShadDialog(
+                                                                      title: const Text(
+                                                                        'Stop container?',
+                                                                      ),
+                                                                      child: Text(
+                                                                        'Container ${c.id.substring(0, 12)}',
+                                                                      ),
+                                                                      actions: [
+                                                                        ShadButton.secondary(
+                                                                          onPressed:
+                                                                              () => Navigator.pop(
+                                                                                ctx,
+                                                                                false,
+                                                                              ),
+                                                                          child: const Text(
+                                                                            'Cancel',
+                                                                          ),
+                                                                        ),
+                                                                        ShadButton.destructive(
+                                                                          onPressed:
+                                                                              () => Navigator.pop(
+                                                                                ctx,
+                                                                                true,
+                                                                              ),
+                                                                          child: const Text(
+                                                                            'Stop',
+                                                                          ),
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                              ) ??
+                                                              false;
+                                                          if (!confirm) return;
+
+                                                          try {
+                                                            await widget
+                                                                .client
+                                                                .containers
+                                                                .stopContainer(
+                                                                  containerId:
+                                                                      c.id,
+                                                                );
+                                                            ShadToaster.of(
+                                                              context,
+                                                            ).show(
+                                                              const ShadToast(
+                                                                description: Text(
+                                                                  'Container stopped',
+                                                                ),
+                                                              ),
+                                                            );
+                                                            containersResource
+                                                                .refresh();
+                                                          } catch (e) {
+                                                            ShadToaster.of(
+                                                              context,
+                                                            ).show(
+                                                              ShadToast(
+                                                                description: Text(
+                                                                  'Stop failed: $e',
+                                                                ),
+                                                              ),
+                                                            );
+                                                          }
+                                                        },
+                                              ),
+
+                                              IconButton(
+                                                icon: const Icon(
+                                                  LucideIcons.trash,
+                                                ),
+                                                tooltip: 'Delete',
                                                 onPressed: () async {
                                                   final confirm =
                                                       await showShadDialog<
@@ -419,7 +504,7 @@ class _ContainerTableState extends State<ContainerTable> {
                                                         builder:
                                                             (ctx) => ShadDialog(
                                                               title: const Text(
-                                                                'Stop container?',
+                                                                'Delete container?',
                                                               ),
                                                               child: Text(
                                                                 'Container ${c.id.substring(0, 12)}',
@@ -445,7 +530,7 @@ class _ContainerTableState extends State<ContainerTable> {
                                                                           ),
                                                                   child:
                                                                       const Text(
-                                                                        'Stop',
+                                                                        'Delete',
                                                                       ),
                                                                 ),
                                                               ],
@@ -458,7 +543,7 @@ class _ContainerTableState extends State<ContainerTable> {
                                                     await widget
                                                         .client
                                                         .containers
-                                                        .stop(
+                                                        .deleteContainer(
                                                           containerId: c.id,
                                                         );
                                                     ShadToaster.of(
@@ -466,7 +551,7 @@ class _ContainerTableState extends State<ContainerTable> {
                                                     ).show(
                                                       const ShadToast(
                                                         description: Text(
-                                                          'Container stopped',
+                                                          'Container deleted',
                                                         ),
                                                       ),
                                                     );
@@ -478,7 +563,7 @@ class _ContainerTableState extends State<ContainerTable> {
                                                     ).show(
                                                       ShadToast(
                                                         description: Text(
-                                                          'Stop failed: $e',
+                                                          'Delete failed: $e',
                                                         ),
                                                       ),
                                                     );
