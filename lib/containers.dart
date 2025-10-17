@@ -614,7 +614,7 @@ class _ConfigureServiceTemplateDialog
 
   /// Replace `${VAR}` or `{{VAR}}` tokens in [spec.command] with current values.
   String _renderCommand() {
-    var cmd = widget.spec.command ?? '';
+    var cmd = widget.spec.container?.command ?? '';
     _vars.forEach((key, value) {
       cmd = cmd.replaceAll('\${$key}', value).replaceAll('{{${key}}}', value);
     });
@@ -710,7 +710,7 @@ class _ConfigureServiceTemplateDialog
               ),
 
             // ── Command preview ─────────────────────────────────────────────
-            if (widget.spec.command != null) ...[
+            if (widget.spec.container?.command != null) ...[
               const SizedBox(height: 16),
               Text(
                 'Command to execute',
@@ -731,13 +731,13 @@ class _ConfigureServiceTemplateDialog
             ),
             const SizedBox(height: 4),
 
-            if (widget.spec.storage == null ||
-                widget.spec.storage?.room == null)
+            if (widget.spec.container?.storage == null ||
+                widget.spec.container?.storage?.room == null)
               Text("No storage mount"),
 
-            if (widget.spec.storage != null &&
-                widget.spec.storage?.room != null) ...[
-              for (final rs in widget.spec.storage!.room!) ...[
+            if (widget.spec.container?.storage != null &&
+                widget.spec.container?.storage?.room != null) ...[
+              for (final rs in widget.spec.container?.storage?.room ?? []) ...[
                 if (rs.subpath != null) ...[
                   Text(
                     rs.subpath == null
