@@ -767,7 +767,11 @@ class _ConfigureServiceTemplateDialog
                       ...p.endpoints.map(
                         (e) => Padding(
                           padding: const EdgeInsets.only(top: 4),
-                          child: Text('• ${e.path}  →  ${e.identity}'),
+                          child: Text(
+                            (e.meshagent != null)
+                                ? '• ${e.path}  →  ${e.meshagent?.identity}'
+                                : (e.mcp != null ? "${e.path} → mcp" : e.path),
+                          ),
                         ),
                       ),
                     ],
