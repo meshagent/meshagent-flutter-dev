@@ -13,8 +13,6 @@ import './ansi.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
-import 'package:intl/intl.dart';
-
 dynamic trimStrings(dynamic v) {
   if (v is String) {
     if (v.length > 128) {
