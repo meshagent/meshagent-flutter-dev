@@ -105,22 +105,79 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
     });
   }
 
+  bool adding = false;
+
   Widget terminalView(BuildContext context) {
     return Row(
       children: [
         SizedBox(
           width: 300,
           child: ListView(
-            padding: EdgeInsets.all(8),
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             children: [
+              Row(
+                children: [
+                  ShadButton.secondary(
+                    leading:
+                        adding
+                            ? SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(),
+                            )
+                            : Icon(LucideIcons.plus),
+                    onPressed:
+                        adding
+                            ? null
+                            : () async {
+                              setState(() {
+                                adding = true;
+                              });
+                              try {
+                                final containerId = await widget.room.containers
+                                    .run(
+                                      image: "ubuntu:latest",
+                                      command: "sleep infinity",
+                                    );
+
+                                final run = await widget.room.containers.exec(
+                                  containerId: containerId,
+                                  command: "bash",
+                                  tty: true,
+                                );
+                                if (!mounted) {
+                                  return;
+                                }
+                                setState(() {
+                                  runs.add(run);
+                                  selectedRun = run;
+                                });
+                              } finally {
+                                if (mounted) {
+                                  setState(() {
+                                    adding = false;
+                                  });
+                                }
+                              }
+                            },
+                    child: Text("Add Terminal"),
+                  ),
+                  Spacer(),
+                ],
+              ),
               for (final run in runs)
-                (selectedRun == run ? ShadButton.secondary : ShadButton.ghost)(
-                  onPressed: () {
-                    setState(() {
-                      selectedRun = run;
-                    });
-                  },
-                  child: Text(run.command),
+                Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: (selectedRun == run
+                      ? ShadButton.secondary
+                      : ShadButton.ghost)(
+                    onPressed: () {
+                      setState(() {
+                        selectedRun = run;
+                      });
+                    },
+                    child: Text(run.command),
+                  ),
                 ),
             ],
           ),

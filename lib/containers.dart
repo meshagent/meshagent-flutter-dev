@@ -130,10 +130,6 @@ class _ImageTableState extends State<ImageTable> {
                               final tty = widget.client.containers.exec(
                                 containerId: containerId,
                                 tty: true,
-                                image:
-                                    img.tags.isNotEmpty
-                                        ? img.tags.first
-                                        : img.id,
                                 command: "/bin/bash -il",
                               );
 
