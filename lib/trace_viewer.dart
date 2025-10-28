@@ -420,6 +420,15 @@ class _LiveLogViewer extends State<LiveLogViewer> {
       for (final resourceLogs in export.resourceLogs) {
         for (final log in resourceLogs.scopeLogs) {
           logs.addAll(log.logRecords);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              scrollController.animateTo(
+                scrollController.position.maxScrollExtent,
+                duration: Duration(milliseconds: 200),
+                curve: Curves.linear,
+              );
+            }
+          });
           dirty = true;
         }
       }
@@ -436,10 +445,13 @@ class _LiveLogViewer extends State<LiveLogViewer> {
     super.dispose();
   }
 
+  final scrollController = ScrollController();
+
   @override
   Widget build(BuildContext context) {
     return SelectionArea(
       child: SuperListView(
+        controller: scrollController,
         padding: const EdgeInsets.all(20.0),
         children: [
           for (final m in logs) ...[
