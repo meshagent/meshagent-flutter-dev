@@ -102,6 +102,40 @@ class _ImageTableState extends State<ImageTable> {
                                 builder:
                                     (context) => ConfigureServiceTemplateDialog(
                                       spec: img.manifest!,
+                                      actionsBuilder: (
+                                        context,
+                                        variables,
+                                        validate,
+                                      ) {
+                                        bool _ready = variables.values.every(
+                                          (v) => v.trim().isNotEmpty,
+                                        );
+
+                                        return [
+                                          Expanded(
+                                            child: ShadButton.destructive(
+                                              enabled: _ready,
+                                              onPressed: () {
+                                                Navigator.of(context).pop();
+                                              },
+                                              child: const Text('Deny'),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: ShadButton(
+                                              enabled: _ready,
+                                              onPressed: () {
+                                                if (validate()) {
+                                                  Navigator.of(
+                                                    context,
+                                                  ).pop(variables);
+                                                }
+                                              },
+                                              child: const Text('Allow'),
+                                            ),
+                                          ),
+                                        ];
+                                      },
                                     ),
                               );
 
@@ -587,7 +621,18 @@ class _ContainerTableState extends State<ContainerTable> {
 /// once all variables are filled in and the user presses **Continue**.
 class ConfigureServiceTemplateDialog extends StatefulWidget {
   final ServiceTemplateSpec spec;
-  const ConfigureServiceTemplateDialog({super.key, required this.spec});
+  const ConfigureServiceTemplateDialog({
+    super.key,
+    required this.spec,
+    required this.actionsBuilder,
+  });
+
+  final List<Widget> Function(
+    BuildContext,
+    Map<String, String>,
+    bool Function() validate,
+  )
+  actionsBuilder;
 
   @override
   State createState() => _ConfigureServiceTemplateDialog();
@@ -617,15 +662,13 @@ class _ConfigureServiceTemplateDialog
     return cmd.trim();
   }
 
-  bool get _ready => _vars.values.every((v) => v.trim().isNotEmpty);
-
   @override
   Widget build(BuildContext context) {
     final hasVars = widget.spec.variables?.isNotEmpty ?? false;
 
     return ShadDialog(
       padding: const EdgeInsets.all(20),
-      title: Text("Run MeshAgent Service"),
+      title: Text("Configure Service"),
       description: Text(
         "This container contains a MeshAgent service. Running this service will grant it access to your room. Review the service details before continuing.",
       ),
@@ -782,25 +825,10 @@ class _ConfigureServiceTemplateDialog
               mainAxisAlignment: MainAxisAlignment.end,
               spacing: 8,
               children: [
-                Expanded(
-                  child: ShadButton.destructive(
-                    enabled: _ready,
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: const Text('Deny'),
-                  ),
-                ),
-                Expanded(
-                  child: ShadButton(
-                    enabled: _ready,
-                    onPressed: () {
-                      if (_formKey.currentState?.validate() ?? false) {
-                        Navigator.of(context).pop(_vars);
-                      }
-                    },
-                    child: const Text('Allow'),
-                  ),
+                ...widget.actionsBuilder(
+                  context,
+                  _vars,
+                  () => _formKey.currentState?.validate() ?? false,
                 ),
               ],
             ),
