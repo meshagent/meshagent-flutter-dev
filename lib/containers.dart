@@ -672,6 +672,7 @@ class _ConfigureServiceTemplateDialog
       description: Text(
         "This container contains a MeshAgent service. Running this service will grant it access to your room. Review the service details before continuing.",
       ),
+      constraints: BoxConstraints(minWidth: 600, maxWidth: 600),
       child: Form(
         key: _formKey,
         child: ListView(
@@ -752,11 +753,18 @@ class _ConfigureServiceTemplateDialog
             if (widget.spec.container?.command != null) ...[
               const SizedBox(height: 16),
               Text(
+                'Base Image',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 4),
+              SelectableText(widget.spec.container?.image ?? ""),
+              const SizedBox(height: 16),
+              Text(
                 'Command to execute',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 4),
-              Text(
+              SelectableText(
                 _renderCommand().isEmpty
                     ? '— complete the variables above —'
                     : _renderCommand(),
