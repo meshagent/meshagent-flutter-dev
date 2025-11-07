@@ -138,6 +138,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                                     .run(
                                       image: "ubuntu:latest",
                                       command: "sleep infinity",
+                                      mountPath: "/data",
                                     );
 
                                 final run = await widget.room.containers.exec(
