@@ -17,7 +17,7 @@ homepage: https://www.meshagent.com
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.6.4
+version: 0.6.5
 
 environment:
   sdk: "^3.7.0"
@@ -37,8 +37,8 @@ dependencies:
   lucide_icons_flutter: ^3.1.1
   google_fonts: ^6.2.1
   super_sliver_list: ^0.4.1
-  meshagent: ^0.6.4
-  meshagent_flutter: ^0.6.4
+  meshagent: ^0.6.5
+  meshagent_flutter: ^0.6.5
   xterm: ^4.0.0
   stream_transform: ^2.1.1
 
