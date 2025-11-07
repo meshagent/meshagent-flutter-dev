@@ -422,11 +422,11 @@ class _LiveLogViewer extends State<LiveLogViewer> {
           logs.addAll(log.logRecords);
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
-              scrollController.animateTo(
-                scrollController.position.maxScrollExtent,
-                duration: Duration(milliseconds: 200),
-                curve: Curves.linear,
-              );
+              if (scrollController.position.extentAfter < 100) {
+                scrollController.jumpTo(
+                  scrollController.position.maxScrollExtent,
+                );
+              }
             }
           });
           dirty = true;

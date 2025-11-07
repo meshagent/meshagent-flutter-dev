@@ -871,6 +871,7 @@ class _ContainerLogStream extends State<ContainerLogStream> {
     logSub = widget.logs.stream.listen((l) {
       setState(() {
         logs.add(l.trim());
+
         WidgetsBinding.instance.addPostFrameCallback((_) {
           controller.jumpTo(controller.position.maxScrollExtent);
         });

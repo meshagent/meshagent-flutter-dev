@@ -364,11 +364,8 @@ class _LiveLogsViewerState extends State<LiveLogsViewer> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-
-      verticalScrollController.animateTo(
+      verticalScrollController.jumpTo(
         verticalScrollController.position.maxScrollExtent,
-        duration: Duration(milliseconds: 200),
-        curve: Curves.linear,
       );
     });
   }
