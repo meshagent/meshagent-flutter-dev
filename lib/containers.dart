@@ -619,13 +619,14 @@ class _ContainerTableState extends State<ContainerTable> {
 
 /// Accepts a fully‑parsed ServiceTemplateSpec and fires [onSubmit]
 /// once all variables are filled in and the user presses **Continue**.
-class ConfigureServiceTemplateDialog extends StatefulWidget {
-  final ServiceTemplateSpec spec;
+class ConfigureServiceTemplateDialog extends StatelessWidget {
   const ConfigureServiceTemplateDialog({
     super.key,
     required this.spec,
     required this.actionsBuilder,
   });
+
+  final ServiceTemplateSpec spec;
 
   final List<Widget> Function(
     BuildContext,
@@ -635,11 +636,43 @@ class ConfigureServiceTemplateDialog extends StatefulWidget {
   actionsBuilder;
 
   @override
-  State createState() => _ConfigureServiceTemplateDialog();
+  Widget build(BuildContext context) {
+    return ShadDialog(
+      padding: const EdgeInsets.all(20),
+      title: Text("Configure Service"),
+      description: Text(
+        "This container contains a MeshAgent service. Running this service will grant it access to your room. Review the service details before continuing.",
+      ),
+      constraints: BoxConstraints(minWidth: 600, maxWidth: 600),
+      child: ConfigureServiceTemplate(
+        spec: spec,
+        actionsBuilder: actionsBuilder,
+      ),
+    );
+  }
 }
 
-class _ConfigureServiceTemplateDialog
-    extends State<ConfigureServiceTemplateDialog> {
+class ConfigureServiceTemplate extends StatefulWidget {
+  const ConfigureServiceTemplate({
+    super.key,
+    required this.spec,
+    required this.actionsBuilder,
+  });
+
+  final ServiceTemplateSpec spec;
+
+  final List<Widget> Function(
+    BuildContext,
+    Map<String, String>,
+    bool Function() validate,
+  )
+  actionsBuilder;
+
+  @override
+  State createState() => _ConfigureServiceTemplate();
+}
+
+class _ConfigureServiceTemplate extends State<ConfigureServiceTemplate> {
   final _formKey = GlobalKey<FormState>();
   late final Map<String, String> _vars; // {varName: value}
 
@@ -666,182 +699,166 @@ class _ConfigureServiceTemplateDialog
   Widget build(BuildContext context) {
     final hasVars = widget.spec.variables?.isNotEmpty ?? false;
 
-    return ShadDialog(
-      padding: const EdgeInsets.all(20),
-      title: Text("Configure Service"),
-      description: Text(
-        "This container contains a MeshAgent service. Running this service will grant it access to your room. Review the service details before continuing.",
-      ),
-      constraints: BoxConstraints(minWidth: 600, maxWidth: 600),
-      child: Form(
-        key: _formKey,
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            const SizedBox(height: 16),
+    return Form(
+      key: _formKey,
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          const SizedBox(height: 16),
+          Text(
+            widget.spec.metadata.name,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 4),
+          if (widget.spec.metadata.description != null)
+            Text(widget.spec.metadata.description!),
+          const SizedBox(height: 16),
+          // ── Variable inputs ─────────────────────────────────────────────
+          if (hasVars)
             Text(
-              widget.spec.metadata.name,
-              style: Theme.of(context).textTheme.titleLarge,
+              "Required variables",
+              style: Theme.of(context).textTheme.titleMedium,
             ),
-            const SizedBox(height: 4),
-            if (widget.spec.metadata.description != null)
-              Text(widget.spec.metadata.description!),
+          const SizedBox(height: 4),
+          if (widget.spec.variables != null)
+            ...widget.spec.variables!.map(
+              (v) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child:
+                    v.enumValues == null
+                        ? ShadInputFormField(
+                          label: Text(v.name),
+                          obscureText: v.obscure,
+                          description:
+                              v.description == null
+                                  ? null
+                                  : Text(v.description ?? ''),
+
+                          validator:
+                              v.optional
+                                  ? null
+                                  : (txt) =>
+                                      (txt.trim().isEmpty)
+                                          ? '${v.name} is required'
+                                          : null,
+                          onChanged:
+                              (txt) => setState(() => _vars[v.name] = txt),
+                        )
+                        : ShadSelectFormField<String>(
+                          label: Text(v.name),
+                          initialValue: v.enumValues![0],
+                          selectedOptionBuilder:
+                              (context, value) => Text(value),
+                          options: [
+                            ...v.enumValues!.map(
+                              (v) =>
+                                  ShadOption<String>(value: v, child: Text(v)),
+                            ),
+                          ],
+                          description:
+                              v.description == null
+                                  ? null
+                                  : Text(v.description ?? ''),
+                          validator:
+                              v.optional
+                                  ? null
+                                  : (txt) =>
+                                      (txt?.trim().isEmpty == true ||
+                                              txt == null)
+                                          ? '${v.name} is required'
+                                          : null,
+                          onChanged:
+                              (txt) => setState(() => _vars[v.name] = txt!),
+                        ),
+              ),
+            ),
+
+          // ── Command preview ─────────────────────────────────────────────
+          if (widget.spec.container?.command != null) ...[
             const SizedBox(height: 16),
-            // ── Variable inputs ─────────────────────────────────────────────
-            if (hasVars)
-              Text(
-                "Required variables",
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+            Text('Base Image', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 4),
-            if (widget.spec.variables != null)
-              ...widget.spec.variables!.map(
-                (v) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child:
-                      v.enumValues == null
-                          ? ShadInputFormField(
-                            label: Text(v.name),
-                            obscureText: v.obscure,
-                            description:
-                                v.description == null
-                                    ? null
-                                    : Text(v.description ?? ''),
-
-                            validator:
-                                v.optional
-                                    ? null
-                                    : (txt) =>
-                                        (txt.trim().isEmpty)
-                                            ? '${v.name} is required'
-                                            : null,
-                            onChanged:
-                                (txt) => setState(() => _vars[v.name] = txt),
-                          )
-                          : ShadSelectFormField<String>(
-                            label: Text(v.name),
-                            initialValue: v.enumValues![0],
-                            selectedOptionBuilder:
-                                (context, value) => Text(value),
-                            options: [
-                              ...v.enumValues!.map(
-                                (v) => ShadOption<String>(
-                                  value: v,
-                                  child: Text(v),
-                                ),
-                              ),
-                            ],
-                            description:
-                                v.description == null
-                                    ? null
-                                    : Text(v.description ?? ''),
-                            validator:
-                                v.optional
-                                    ? null
-                                    : (txt) =>
-                                        (txt?.trim().isEmpty == true ||
-                                                txt == null)
-                                            ? '${v.name} is required'
-                                            : null,
-                            onChanged:
-                                (txt) => setState(() => _vars[v.name] = txt!),
-                          ),
-                ),
-              ),
-
-            // ── Command preview ─────────────────────────────────────────────
-            if (widget.spec.container?.command != null) ...[
-              const SizedBox(height: 16),
-              Text(
-                'Base Image',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 4),
-              SelectableText(widget.spec.container?.image ?? ""),
-              const SizedBox(height: 16),
-              Text(
-                'Command to execute',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 4),
-              SelectableText(
-                _renderCommand().isEmpty
-                    ? '— complete the variables above —'
-                    : _renderCommand(),
-              ),
-            ],
-
+            SelectableText(widget.spec.container?.image ?? ""),
             const SizedBox(height: 16),
             Text(
-              'Room storage',
+              'Command to execute',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 4),
-
-            if (widget.spec.container?.storage == null ||
-                widget.spec.container?.storage?.room == null)
-              Text("No storage mount"),
-
-            if (widget.spec.container?.storage != null &&
-                widget.spec.container?.storage?.room != null) ...[
-              for (final rs in widget.spec.container?.storage?.room ?? []) ...[
-                if (rs.subpath != null) ...[
-                  Text(
-                    rs.subpath == null
-                        ? "Mounts entire room's storage to"
-                        : "Mounts only ${rs.subpath} to",
-                  ),
-                  Text(rs.path),
-                ],
-              ],
-            ],
-
-            // ── Ports & endpoints summary ──────────────────────────────────
-            if (widget.spec.ports.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              Text('Endpoints', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              ...widget.spec.ports.map(
-                (p) => ShadCard(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Port ${p.num.value ?? "auto assigned"} ${p.type ?? ""}',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      ...p.endpoints.map(
-                        (e) => Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            (e.meshagent != null)
-                                ? '• ${e.path}  →  ${e.meshagent?.identity}'
-                                : (e.mcp != null ? "${e.path} → mcp" : e.path),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-
-            // ── Continue button ─────────────────────────────────────────────
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              spacing: 8,
-              children: [
-                ...widget.actionsBuilder(
-                  context,
-                  _vars,
-                  () => _formKey.currentState?.validate() ?? false,
-                ),
-              ],
+            SelectableText(
+              _renderCommand().isEmpty
+                  ? '— complete the variables above —'
+                  : _renderCommand(),
             ),
           ],
-        ),
+
+          const SizedBox(height: 16),
+          Text('Room storage', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+
+          if (widget.spec.container?.storage == null ||
+              widget.spec.container?.storage?.room == null)
+            Text("No storage mount"),
+
+          if (widget.spec.container?.storage != null &&
+              widget.spec.container?.storage?.room != null) ...[
+            for (final rs in widget.spec.container?.storage?.room ?? []) ...[
+              if (rs.subpath != null) ...[
+                Text(
+                  rs.subpath == null
+                      ? "Mounts entire room's storage to"
+                      : "Mounts only ${rs.subpath} to",
+                ),
+                Text(rs.path),
+              ],
+            ],
+          ],
+
+          // ── Ports & endpoints summary ──────────────────────────────────
+          if (widget.spec.ports.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Text('Endpoints', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            ...widget.spec.ports.map(
+              (p) => ShadCard(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Port ${p.num.value ?? "auto assigned"} ${p.type ?? ""}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    ...p.endpoints.map(
+                      (e) => Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          (e.meshagent != null)
+                              ? '• ${e.path}  →  ${e.meshagent?.identity}'
+                              : (e.mcp != null ? "${e.path} → mcp" : e.path),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+
+          // ── Continue button ─────────────────────────────────────────────
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            spacing: 8,
+            children: [
+              ...widget.actionsBuilder(
+                context,
+                _vars,
+                () => _formKey.currentState?.validate() ?? false,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
