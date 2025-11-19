@@ -547,10 +547,10 @@ class _LiveLogViewer extends State<LiveLogViewer> {
                       TextSpan(
                         style: GoogleFonts.sourceCodePro(
                           color: switch (m.severity) {
-                            Severity.warn => Colors.yellow,
-                            Severity.warn2 => Colors.yellow,
-                            Severity.warn3 => Colors.yellow,
-                            Severity.warn4 => Colors.yellow,
+                            Severity.warn => Colors.orange,
+                            Severity.warn2 => Colors.orange,
+                            Severity.warn3 => Colors.orange,
+                            Severity.warn4 => Colors.orange,
                             Severity.error => Colors.red,
                             Severity.error2 => Colors.red,
                             Severity.error3 => Colors.red,
