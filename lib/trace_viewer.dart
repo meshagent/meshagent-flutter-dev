@@ -525,7 +525,9 @@ class _LiveLogViewer extends State<LiveLogViewer> {
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
-                                            TextSpan(text: attribute.value),
+                                            TextSpan(
+                                              text: "${attribute.value}",
+                                            ),
                                           ],
                                         ),
                                       ),
