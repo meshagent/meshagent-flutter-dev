@@ -132,31 +132,30 @@ class SpanTreeNodeViewer extends StatefulWidget {
   }
 
   static final visualizers = <String, Widget Function(BuildContext, Span)>{
-    "chatbot.thread.message":
-        (context, span) => Container(
-          padding: EdgeInsets.all(10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                "${span.attributes.where((a) => a.key == "from_participant_name").firstOrNull?.value.toString() ?? ""}:",
-                style: ShadTheme.of(context).textTheme.p,
-              ),
-
-              ChatBubble(
-                mine: false,
-                text:
-                    span.attributes
-                        .where((a) => a.key == "text")
-                        .firstOrNull
-                        ?.value
-                        .toString() ??
-                    "",
-              ),
-            ],
+    "chatbot.thread.message": (context, span) => Container(
+      padding: EdgeInsets.all(10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            "${span.attributes.where((a) => a.key == "from_participant_name").firstOrNull?.value.toString() ?? ""}:",
+            style: ShadTheme.of(context).textTheme.p,
           ),
-        ),
+
+          ChatBubble(
+            mine: false,
+            text:
+                span.attributes
+                    .where((a) => a.key == "text")
+                    .firstOrNull
+                    ?.value
+                    .toString() ??
+                "",
+          ),
+        ],
+      ),
+    ),
   };
 }
 
@@ -202,15 +201,14 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
 
   Widget spanTooltip(Span node, Widget child) {
     return ShadTooltip(
-      builder:
-          (context) => SizedBox(
-            width: 400,
-            child: DefaultTextStyle(
-              style: ShadTheme.of(context).textTheme.p,
-              textAlign: TextAlign.left,
-              child: visualize(node),
-            ),
-          ),
+      builder: (context) => SizedBox(
+        width: 400,
+        child: DefaultTextStyle(
+          style: ShadTheme.of(context).textTheme.p,
+          textAlign: TextAlign.left,
+          child: visualize(node),
+        ),
+      ),
       child: child,
     );
   }
@@ -218,9 +216,10 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
   @override
   Widget build(BuildContext context) {
     final node = widget.node;
-    final duration = ((node.endTimeUnixNano - node.startTimeUnixNano) /
-            1000000000)
-        .asFixed(2);
+    final duration =
+        ((node.endTimeUnixNano - node.startTimeUnixNano) / 1000000000).asFixed(
+          2,
+        );
 
     final totalDuration = widget.end - widget.start;
     final startPct =
@@ -240,14 +239,12 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
             spanTooltip(
               node,
               ShadButton.link(
-                hoverForegroundColor:
-                    node.status?.code == "STATUS_CODE_ERROR"
-                        ? Colors.red
-                        : null,
-                foregroundColor:
-                    node.status?.code == "STATUS_CODE_ERROR"
-                        ? Colors.red
-                        : null,
+                hoverForegroundColor: node.status?.code == "STATUS_CODE_ERROR"
+                    ? Colors.red
+                    : null,
+                foregroundColor: node.status?.code == "STATUS_CODE_ERROR"
+                    ? Colors.red
+                    : null,
                 onTapDown: (_) {
                   setState(() {
                     expanded = !expanded;
@@ -261,14 +258,14 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
                       padding: EdgeInsets.only(right: 10),
                       child:
                           (widget.spans
-                                  .getChildren(widget.node.spanId)
-                                  .isNotEmpty)
-                              ? Icon(
-                                expanded
-                                    ? LucideIcons.chevronDown
-                                    : LucideIcons.chevronRight,
-                              )
-                              : Icon(LucideIcons.dot),
+                              .getChildren(widget.node.spanId)
+                              .isNotEmpty)
+                          ? Icon(
+                              expanded
+                                  ? LucideIcons.chevronDown
+                                  : LucideIcons.chevronRight,
+                            )
+                          : Icon(LucideIcons.dot),
                     ),
                     Padding(
                       padding: EdgeInsets.only(right: 10),
@@ -305,58 +302,56 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
                   Container(
                     padding: EdgeInsets.all(8),
                     child: LayoutBuilder(
-                      builder:
-                          (context, constraints) => SizedBox(
-                            height: 30,
-                            child: Stack(
-                              children: [
-                                Positioned(
-                                  top: 0,
-                                  bottom: 0,
-                                  left: startPct * constraints.maxWidth,
-                                  width: durationPct * constraints.maxWidth,
-                                  child: ShadTooltip(
-                                    builder: (context) {
-                                      return Padding(
-                                        padding: EdgeInsets.all(16),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              node.name,
-                                              style:
-                                                  ShadTheme.of(
-                                                    context,
-                                                  ).textTheme.muted,
-                                            ),
-                                            Text(
-                                              "Started: ${DateFormat.yMMMMEEEEd().add_jm().format(DateTime.fromMicrosecondsSinceEpoch((node.startTimeUnixNano / 1000).toInt(), isUtc: true).toLocal())}",
-                                            ),
-                                            Text(
-                                              "Ended: ${DateFormat.yMMMMEEEEd().add_jm().format(DateTime.fromMicrosecondsSinceEpoch((node.startTimeUnixNano / 1000).toInt(), isUtc: true).toLocal())}",
-                                            ),
-                                            Text("Duration: ${duration}s"),
-                                          ],
+                      builder: (context, constraints) => SizedBox(
+                        height: 30,
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              top: 0,
+                              bottom: 0,
+                              left: startPct * constraints.maxWidth,
+                              width: durationPct * constraints.maxWidth,
+                              child: ShadTooltip(
+                                builder: (context) {
+                                  return Padding(
+                                    padding: EdgeInsets.all(16),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          node.name,
+                                          style: ShadTheme.of(
+                                            context,
+                                          ).textTheme.muted,
                                         ),
-                                      );
-                                    },
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        border: Border.all(
-                                          color: Colors.green,
-                                          width: 3,
+                                        Text(
+                                          "Started: ${DateFormat.yMMMMEEEEd().add_jm().format(DateTime.fromMicrosecondsSinceEpoch((node.startTimeUnixNano / 1000).toInt(), isUtc: true).toLocal())}",
                                         ),
-                                        borderRadius: BorderRadius.circular(3),
-                                        color: Colors.lightGreenAccent,
-                                      ),
+                                        Text(
+                                          "Ended: ${DateFormat.yMMMMEEEEd().add_jm().format(DateTime.fromMicrosecondsSinceEpoch((node.startTimeUnixNano / 1000).toInt(), isUtc: true).toLocal())}",
+                                        ),
+                                        Text("Duration: ${duration}s"),
+                                      ],
                                     ),
+                                  );
+                                },
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: Colors.green,
+                                      width: 3,
+                                    ),
+                                    borderRadius: BorderRadius.circular(3),
+                                    color: Colors.lightGreenAccent,
                                   ),
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
 
@@ -466,75 +461,71 @@ class _LiveLogViewer extends State<LiveLogViewer> {
                       showShadSheet(
                         side: ShadSheetSide.right,
                         context: context,
-                        builder:
-                            (context) => ShadSheet(
-                              title: Text("Log Details"),
-                              constraints: BoxConstraints(
-                                minWidth: 500,
-                                maxWidth: 500,
-                              ),
-                              child: SelectionArea(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text.rich(
+                        builder: (context) => ShadSheet(
+                          title: Text("Log Details"),
+                          constraints: BoxConstraints(
+                            minWidth: 500,
+                            maxWidth: 500,
+                          ),
+                          child: SelectionArea(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text.rich(
+                                  TextSpan(
+                                    children: [
                                       TextSpan(
-                                        children: [
-                                          TextSpan(
-                                            text: "timestamp: ",
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          TextSpan(
-                                            text: DateFormat.yMMMMEEEEd()
-                                                .add_jm()
-                                                .format(
-                                                  DateTime.fromMicrosecondsSinceEpoch(
-                                                    (m.timeUnixNano / 1000)
-                                                        .toInt(),
-                                                    isUtc: true,
-                                                  ).toLocal(),
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Text.rich(
-                                      TextSpan(
-                                        children: [
-                                          TextSpan(
-                                            text: "severity: ",
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          TextSpan(text: m.severity.name),
-                                        ],
-                                      ),
-                                    ),
-
-                                    for (final attribute in m.attributes)
-                                      Text.rich(
-                                        TextSpan(
-                                          children: [
-                                            TextSpan(
-                                              text: "${attribute.key}: ",
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            TextSpan(
-                                              text: "${attribute.value}",
-                                            ),
-                                          ],
+                                        text: "timestamp: ",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                  ],
+                                      TextSpan(
+                                        text: DateFormat.yMMMMEEEEd()
+                                            .add_jm()
+                                            .format(
+                                              DateTime.fromMicrosecondsSinceEpoch(
+                                                (m.timeUnixNano / 1000).toInt(),
+                                                isUtc: true,
+                                              ).toLocal(),
+                                            ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
+                                Text.rich(
+                                  TextSpan(
+                                    children: [
+                                      TextSpan(
+                                        text: "severity: ",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      TextSpan(text: m.severity.name),
+                                    ],
+                                  ),
+                                ),
+
+                                for (final attribute in m.attributes)
+                                  Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        TextSpan(
+                                          text: "${attribute.key}: ",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        TextSpan(text: "${attribute.value}"),
+                                      ],
+                                    ),
+                                  ),
+                              ],
                             ),
+                          ),
+                        ),
                       );
                     },
                     child: Padding(
@@ -838,11 +829,10 @@ class Span {
     kind: _kindFromJson(j['kind']),
     startTimeUnixNano: int.parse(j['startTimeUnixNano'].toString()),
     endTimeUnixNano: int.parse(j['endTimeUnixNano'].toString()),
-    attributes:
-        (j['attributes'] as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>()
-            .map(Attribute.fromJson)
-            .toList(),
+    attributes: (j['attributes'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(Attribute.fromJson)
+        .toList(),
     status: j['status'] != null ? Status.fromJson(j['status']) : null,
     flags: j['flags'],
   );
@@ -881,11 +871,10 @@ class ScopeSpans {
 
   factory ScopeSpans.fromJson(Map<String, dynamic> j) => ScopeSpans(
     scope: Scope.fromJson(j['scope'] ?? const {}),
-    spans:
-        (j['spans'] as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>()
-            .map(Span.fromJson)
-            .toList(),
+    spans: (j['spans'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(Span.fromJson)
+        .toList(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -899,11 +888,10 @@ class Resource {
   final List<Attribute> attributes;
 
   factory Resource.fromJson(Map<String, dynamic> j) => Resource(
-    attributes:
-        (j['attributes'] as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>()
-            .map(Attribute.fromJson)
-            .toList(),
+    attributes: (j['attributes'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(Attribute.fromJson)
+        .toList(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -918,11 +906,10 @@ class ResourceSpans {
 
   factory ResourceSpans.fromJson(Map<String, dynamic> j) => ResourceSpans(
     resource: Resource.fromJson(j['resource'] ?? const {}),
-    scopeSpans:
-        (j['scopeSpans'] as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>()
-            .map(ScopeSpans.fromJson)
-            .toList(),
+    scopeSpans: (j['scopeSpans'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(ScopeSpans.fromJson)
+        .toList(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -940,11 +927,10 @@ class OtlpTraceExport {
       OtlpTraceExport.fromJson(json.decode(jsonStr) as Map<String, dynamic>);
 
   factory OtlpTraceExport.fromJson(Map<String, dynamic> j) => OtlpTraceExport(
-    resourceSpans:
-        (j['resourceSpans'] as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>()
-            .map(ResourceSpans.fromJson)
-            .toList(),
+    resourceSpans: (j['resourceSpans'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(ResourceSpans.fromJson)
+        .toList(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -1020,18 +1006,16 @@ class LogRecord {
 
   factory LogRecord.fromJson(Map<String, dynamic> j) => LogRecord(
     timeUnixNano: int.parse(j['timeUnixNano'].toString()),
-    observedTimeUnixNano:
-        j['observedTimeUnixNano'] != null
-            ? int.parse(j['observedTimeUnixNano'].toString())
-            : null,
+    observedTimeUnixNano: j['observedTimeUnixNano'] != null
+        ? int.parse(j['observedTimeUnixNano'].toString())
+        : null,
     severity: _sevFromJson(j['severityNumber']),
     severityText: j['severityText'],
     body: _unwrapValue(j['body'] as Map<String, dynamic>),
-    attributes:
-        (j['attributes'] as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>()
-            .map(Attribute.fromJson)
-            .toList(),
+    attributes: (j['attributes'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(Attribute.fromJson)
+        .toList(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -1053,11 +1037,10 @@ class ScopeLogs {
 
   factory ScopeLogs.fromJson(Map<String, dynamic> j) => ScopeLogs(
     scope: Scope.fromJson(j['scope'] ?? const {}),
-    logRecords:
-        (j['logRecords'] as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>()
-            .map(LogRecord.fromJson)
-            .toList(),
+    logRecords: (j['logRecords'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(LogRecord.fromJson)
+        .toList(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -1073,11 +1056,10 @@ class ResourceLogs {
 
   factory ResourceLogs.fromJson(Map<String, dynamic> j) => ResourceLogs(
     resource: Resource.fromJson(j['resource'] ?? const {}),
-    scopeLogs:
-        (j['scopeLogs'] as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>()
-            .map(ScopeLogs.fromJson)
-            .toList(),
+    scopeLogs: (j['scopeLogs'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(ScopeLogs.fromJson)
+        .toList(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -1095,11 +1077,10 @@ class OtlpLogExport {
       OtlpLogExport.fromJson(json.decode(jsonStr) as Map<String, dynamic>);
 
   factory OtlpLogExport.fromJson(Map<String, dynamic> j) => OtlpLogExport(
-    resourceLogs:
-        (j['resourceLogs'] as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>()
-            .map(ResourceLogs.fromJson)
-            .toList(),
+    resourceLogs: (j['resourceLogs'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(ResourceLogs.fromJson)
+        .toList(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -1166,11 +1147,10 @@ class NumberDataPoint {
       startTimeUnixNano: int.parse(j['startTimeUnixNano'].toString()),
       timeUnixNano: int.parse(j['timeUnixNano'].toString()),
       value: _parseValue(j),
-      attributes:
-          (j['attributes'] as List<dynamic>? ?? [])
-              .cast<Map<String, dynamic>>()
-              .map(Attribute.fromJson)
-              .toList(),
+      attributes: (j['attributes'] as List<dynamic>? ?? [])
+          .cast<Map<String, dynamic>>()
+          .map(Attribute.fromJson)
+          .toList(),
     );
   }
 
@@ -1196,11 +1176,10 @@ class Sum {
   final bool isMonotonic;
 
   factory Sum.fromJson(Map<String, dynamic> j) => Sum(
-    dataPoints:
-        (j['dataPoints'] as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>()
-            .map(NumberDataPoint.fromJson)
-            .toList(),
+    dataPoints: (j['dataPoints'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(NumberDataPoint.fromJson)
+        .toList(),
     aggregationTemporality: _aggFromJson(j['aggregationTemporality']),
     isMonotonic: j['isMonotonic'] ?? false,
   );
@@ -1219,11 +1198,10 @@ class Gauge {
   final List<NumberDataPoint> dataPoints;
 
   factory Gauge.fromJson(Map<String, dynamic> j) => Gauge(
-    dataPoints:
-        (j['dataPoints'] as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>()
-            .map(NumberDataPoint.fromJson)
-            .toList(),
+    dataPoints: (j['dataPoints'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(NumberDataPoint.fromJson)
+        .toList(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -1293,11 +1271,10 @@ class ScopeMetrics {
 
   factory ScopeMetrics.fromJson(Map<String, dynamic> j) => ScopeMetrics(
     scope: Scope.fromJson(j['scope'] ?? const {}),
-    metrics:
-        (j['metrics'] as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>()
-            .map(Metric.fromJson)
-            .toList(),
+    metrics: (j['metrics'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(Metric.fromJson)
+        .toList(),
   );
 
   Map<String, dynamic> toJson() => {
@@ -1313,11 +1290,10 @@ class ResourceMetrics {
 
   factory ResourceMetrics.fromJson(Map<String, dynamic> j) => ResourceMetrics(
     resource: Resource.fromJson(j['resource'] ?? const {}),
-    scopeMetrics:
-        (j['scopeMetrics'] as List<dynamic>? ?? [])
-            .cast<Map<String, dynamic>>()
-            .map(ScopeMetrics.fromJson)
-            .toList(),
+    scopeMetrics: (j['scopeMetrics'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(ScopeMetrics.fromJson)
+        .toList(),
   );
 
   Map<String, dynamic> toJson() => {

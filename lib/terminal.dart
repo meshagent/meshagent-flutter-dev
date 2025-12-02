@@ -113,10 +113,9 @@ class _RoomTerminal extends State<RoomTerminal> {
         return TerminalView(
           terminal,
           textStyle: TerminalStyle(
-            fontFamily:
-                GoogleFonts.sourceCodePro(
-                  fontWeight: FontWeight.w500,
-                ).fontFamily!,
+            fontFamily: GoogleFonts.sourceCodePro(
+              fontWeight: FontWeight.w500,
+            ).fontFamily!,
             fontSize: 15,
           ),
           padding: EdgeInsets.all(16),
@@ -194,10 +193,9 @@ class _ContainerTerminal extends State<ContainerTerminal> {
         return TerminalView(
           terminal,
           textStyle: TerminalStyle(
-            fontFamily:
-                GoogleFonts.sourceCodePro(
-                  fontWeight: FontWeight.w500,
-                ).fontFamily!,
+            fontFamily: GoogleFonts.sourceCodePro(
+              fontWeight: FontWeight.w500,
+            ).fontFamily!,
             fontSize: 15,
           ),
           padding: EdgeInsets.all(16),

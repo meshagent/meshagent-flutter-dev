@@ -99,43 +99,41 @@ class _ImageTableState extends State<ImageTable> {
                             if (img.manifest != null) {
                               vars = await showShadDialog(
                                 context: context,
-                                builder:
-                                    (context) => ConfigureServiceTemplateDialog(
+                                builder: (context) =>
+                                    ConfigureServiceTemplateDialog(
                                       spec: img.manifest!,
-                                      actionsBuilder: (
-                                        context,
-                                        variables,
-                                        validate,
-                                      ) {
-                                        bool _ready = variables.values.every(
-                                          (v) => v.trim().isNotEmpty,
-                                        );
+                                      actionsBuilder:
+                                          (context, variables, validate) {
+                                            bool _ready = variables.values
+                                                .every(
+                                                  (v) => v.trim().isNotEmpty,
+                                                );
 
-                                        return [
-                                          Expanded(
-                                            child: ShadButton.destructive(
-                                              enabled: _ready,
-                                              onPressed: () {
-                                                Navigator.of(context).pop();
-                                              },
-                                              child: const Text('Deny'),
-                                            ),
-                                          ),
-                                          Expanded(
-                                            child: ShadButton(
-                                              enabled: _ready,
-                                              onPressed: () {
-                                                if (validate()) {
-                                                  Navigator.of(
-                                                    context,
-                                                  ).pop(variables);
-                                                }
-                                              },
-                                              child: const Text('Allow'),
-                                            ),
-                                          ),
-                                        ];
-                                      },
+                                            return [
+                                              Expanded(
+                                                child: ShadButton.destructive(
+                                                  enabled: _ready,
+                                                  onPressed: () {
+                                                    Navigator.of(context).pop();
+                                                  },
+                                                  child: const Text('Deny'),
+                                                ),
+                                              ),
+                                              Expanded(
+                                                child: ShadButton(
+                                                  enabled: _ready,
+                                                  onPressed: () {
+                                                    if (validate()) {
+                                                      Navigator.of(
+                                                        context,
+                                                      ).pop(variables);
+                                                    }
+                                                  },
+                                                  child: const Text('Allow'),
+                                                ),
+                                              ),
+                                            ];
+                                          },
                                     ),
                               );
 
@@ -144,20 +142,18 @@ class _ImageTableState extends State<ImageTable> {
                               }
 
                               widget.client.containers.run(
-                                image:
-                                    img.tags.isNotEmpty
-                                        ? img.tags.first
-                                        : img.id,
+                                image: img.tags.isNotEmpty
+                                    ? img.tags.first
+                                    : img.id,
                                 variables: vars,
                               );
                             } else {
                               final containerId = await widget.client.containers
                                   .run(
                                     command: "sleep infinity",
-                                    image:
-                                        img.tags.isNotEmpty
-                                            ? img.tags.first
-                                            : img.id,
+                                    image: img.tags.isNotEmpty
+                                        ? img.tags.first
+                                        : img.id,
                                     variables: vars,
                                   );
 
@@ -203,8 +199,9 @@ class _ImageTableState extends State<ImageTable> {
                                   ? img.tags.first
                                   : '(untagged)',
                               style: TextStyle(
-                                color:
-                                    img.manifest != null ? Colors.green : null,
+                                color: img.manifest != null
+                                    ? Colors.green
+                                    : null,
                               ),
                             ),
                           ),
@@ -227,35 +224,34 @@ class _ImageTableState extends State<ImageTable> {
                           final confirm =
                               await showShadDialog<bool>(
                                 context: context,
-                                builder:
-                                    (ctx) => ShadDialog(
-                                      title: const Text('Delete image?'),
-                                      child: Text(
-                                        img.tags.isNotEmpty
-                                            ? img.tags.first
-                                            : img.id,
-                                      ),
-                                      actions: [
-                                        ShadButton.secondary(
-                                          onPressed:
-                                              () => Navigator.pop(ctx, false),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        ShadButton.destructive(
-                                          onPressed:
-                                              () => Navigator.pop(ctx, true),
-                                          child: const Text('Delete'),
-                                        ),
-                                      ],
+                                builder: (ctx) => ShadDialog(
+                                  title: const Text('Delete image?'),
+                                  child: Text(
+                                    img.tags.isNotEmpty
+                                        ? img.tags.first
+                                        : img.id,
+                                  ),
+                                  actions: [
+                                    ShadButton.secondary(
+                                      onPressed: () =>
+                                          Navigator.pop(ctx, false),
+                                      child: const Text('Cancel'),
                                     ),
+                                    ShadButton.destructive(
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: const Text('Delete'),
+                                    ),
+                                  ],
+                                ),
                               ) ??
                               false;
                           if (!confirm) return;
 
                           try {
                             await widget.client.containers.deleteImage(
-                              image:
-                                  img.tags.isNotEmpty ? img.tags.first : img.id,
+                              image: img.tags.isNotEmpty
+                                  ? img.tags.first
+                                  : img.id,
                             );
                             ShadToaster.of(context).show(
                               const ShadToast(
@@ -350,221 +346,119 @@ class _ContainerTableState extends State<ContainerTable> {
               ),
             ),
             Expanded(
-              child:
-                  containersResource.state.value!.isEmpty
-                      ? const Center(child: Text('No running containers'))
-                      : LayoutBuilder(
-                        builder:
-                            (context, constraints) => SingleChildScrollView(
-                              scrollDirection: Axis.vertical,
-                              child: DataTable(
-                                columns: const [
-                                  DataColumn(label: Text('Status')),
-                                  DataColumn(label: Text('Image')),
-                                  DataColumn(label: Text('Started by')),
-                                  DataColumn(
-                                    label: Text(''),
-                                  ), // stop‑button column
-                                ],
-                                rows: [
-                                  for (final c
-                                      in containersResource.state.value!)
-                                    DataRow(
-                                      cells: [
-                                        DataCell(Text(c.state)),
-                                        DataCell(
-                                          ConstrainedBox(
-                                            constraints: BoxConstraints(
-                                              maxWidth:
-                                                  constraints.maxWidth * .75,
-                                            ),
-                                            child: Text(
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              [c.image].join(' '),
-                                              style: TextStyle(
-                                                color:
-                                                    c.manifest != null
-                                                        ? Colors.green
-                                                        : null,
-                                              ),
-                                            ),
-                                          ),
+              child: containersResource.state.value!.isEmpty
+                  ? const Center(child: Text('No running containers'))
+                  : LayoutBuilder(
+                      builder: (context, constraints) => SingleChildScrollView(
+                        scrollDirection: Axis.vertical,
+                        child: DataTable(
+                          columns: const [
+                            DataColumn(label: Text('Status')),
+                            DataColumn(label: Text('Image')),
+                            DataColumn(label: Text('Started by')),
+                            DataColumn(label: Text('')), // stop‑button column
+                          ],
+                          rows: [
+                            for (final c in containersResource.state.value!)
+                              DataRow(
+                                cells: [
+                                  DataCell(Text(c.state)),
+                                  DataCell(
+                                    ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxWidth: constraints.maxWidth * .75,
+                                      ),
+                                      child: Text(
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        [c.image].join(' '),
+                                        style: TextStyle(
+                                          color: c.manifest != null
+                                              ? Colors.green
+                                              : null,
                                         ),
-                                        DataCell(
-                                          Text(
-                                            c.startedBy.name,
-                                            style: TextStyle(
-                                              color:
-                                                  c.manifest != null
-                                                      ? Colors.green
-                                                      : null,
-                                            ),
-                                          ),
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      c.startedBy.name,
+                                      style: TextStyle(
+                                        color: c.manifest != null
+                                            ? Colors.green
+                                            : null,
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(LucideIcons.logs),
+                                          tooltip: "Logs",
+                                          onPressed: () {
+                                            showShadDialog(
+                                              context: context,
+                                              builder: (context) => ShadDialog(
+                                                constraints: BoxConstraints(
+                                                  minWidth: 1024,
+                                                  minHeight: 600,
+                                                  maxHeight: 700,
+                                                  maxWidth: 1024,
+                                                ),
+                                                title: Text("Container logs"),
+                                                child: ContainerLogs(
+                                                  client: widget.client,
+                                                  containerId: c.id,
+                                                ),
+                                              ),
+                                            );
+                                          },
                                         ),
-                                        DataCell(
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              IconButton(
-                                                icon: const Icon(
-                                                  LucideIcons.logs,
-                                                ),
-                                                tooltip: "Logs",
-                                                onPressed: () {
-                                                  showShadDialog(
-                                                    context: context,
-                                                    builder:
-                                                        (context) => ShadDialog(
-                                                          constraints:
-                                                              BoxConstraints(
-                                                                minWidth: 1024,
-                                                                minHeight: 600,
-                                                                maxHeight: 700,
-                                                                maxWidth: 1024,
-                                                              ),
-                                                          title: Text(
-                                                            "Container logs",
-                                                          ),
-                                                          child: ContainerLogs(
-                                                            client:
-                                                                widget.client,
-                                                            containerId: c.id,
-                                                          ),
-                                                        ),
-                                                  );
-                                                },
-                                              ),
-                                              IconButton(
-                                                icon: const Icon(
-                                                  LucideIcons.circleStop,
-                                                ),
-                                                tooltip: 'Stop',
-                                                onPressed:
-                                                    c.state == "EXITED"
-                                                        ? null
-                                                        : () async {
-                                                          final confirm =
-                                                              await showShadDialog<
-                                                                bool
-                                                              >(
-                                                                context:
-                                                                    context,
-                                                                builder:
-                                                                    (
-                                                                      ctx,
-                                                                    ) => ShadDialog(
-                                                                      title: const Text(
-                                                                        'Stop container?',
-                                                                      ),
-                                                                      child: Text(
-                                                                        'Container ${c.id.substring(0, 12)}',
-                                                                      ),
-                                                                      actions: [
-                                                                        ShadButton.secondary(
-                                                                          onPressed:
-                                                                              () => Navigator.pop(
-                                                                                ctx,
-                                                                                false,
-                                                                              ),
-                                                                          child: const Text(
-                                                                            'Cancel',
-                                                                          ),
-                                                                        ),
-                                                                        ShadButton.destructive(
-                                                                          onPressed:
-                                                                              () => Navigator.pop(
-                                                                                ctx,
-                                                                                true,
-                                                                              ),
-                                                                          child: const Text(
-                                                                            'Stop',
-                                                                          ),
-                                                                        ),
-                                                                      ],
-                                                                    ),
-                                                              ) ??
-                                                              false;
-                                                          if (!confirm) return;
-
-                                                          try {
-                                                            await widget
-                                                                .client
-                                                                .containers
-                                                                .stop(
-                                                                  containerId:
-                                                                      c.id,
-                                                                );
-                                                            ShadToaster.of(
-                                                              context,
-                                                            ).show(
-                                                              const ShadToast(
-                                                                description: Text(
-                                                                  'Container stopped',
-                                                                ),
-                                                              ),
-                                                            );
-                                                            containersResource
-                                                                .refresh();
-                                                          } catch (e) {
-                                                            ShadToaster.of(
-                                                              context,
-                                                            ).show(
-                                                              ShadToast(
-                                                                description: Text(
-                                                                  'Stop failed: $e',
-                                                                ),
-                                                              ),
-                                                            );
-                                                          }
-                                                        },
-                                              ),
-
-                                              IconButton(
-                                                icon: const Icon(
-                                                  LucideIcons.trash,
-                                                ),
-                                                tooltip: 'Delete',
-                                                onPressed: () async {
+                                        IconButton(
+                                          icon: const Icon(
+                                            LucideIcons.circleStop,
+                                          ),
+                                          tooltip: 'Stop',
+                                          onPressed: c.state == "EXITED"
+                                              ? null
+                                              : () async {
                                                   final confirm =
                                                       await showShadDialog<
                                                         bool
                                                       >(
                                                         context: context,
-                                                        builder:
-                                                            (ctx) => ShadDialog(
-                                                              title: const Text(
-                                                                'Delete container?',
+                                                        builder: (ctx) => ShadDialog(
+                                                          title: const Text(
+                                                            'Stop container?',
+                                                          ),
+                                                          child: Text(
+                                                            'Container ${c.id.substring(0, 12)}',
+                                                          ),
+                                                          actions: [
+                                                            ShadButton.secondary(
+                                                              onPressed: () =>
+                                                                  Navigator.pop(
+                                                                    ctx,
+                                                                    false,
+                                                                  ),
+                                                              child: const Text(
+                                                                'Cancel',
                                                               ),
-                                                              child: Text(
-                                                                'Container ${c.id.substring(0, 12)}',
-                                                              ),
-                                                              actions: [
-                                                                ShadButton.secondary(
-                                                                  onPressed:
-                                                                      () => Navigator.pop(
-                                                                        ctx,
-                                                                        false,
-                                                                      ),
-                                                                  child:
-                                                                      const Text(
-                                                                        'Cancel',
-                                                                      ),
-                                                                ),
-                                                                ShadButton.destructive(
-                                                                  onPressed:
-                                                                      () =>
-                                                                          Navigator.pop(
-                                                                            ctx,
-                                                                            true,
-                                                                          ),
-                                                                  child:
-                                                                      const Text(
-                                                                        'Delete',
-                                                                      ),
-                                                                ),
-                                                              ],
                                                             ),
+                                                            ShadButton.destructive(
+                                                              onPressed: () =>
+                                                                  Navigator.pop(
+                                                                    ctx,
+                                                                    true,
+                                                                  ),
+                                                              child: const Text(
+                                                                'Stop',
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
                                                       ) ??
                                                       false;
                                                   if (!confirm) return;
@@ -573,7 +467,7 @@ class _ContainerTableState extends State<ContainerTable> {
                                                     await widget
                                                         .client
                                                         .containers
-                                                        .deleteContainer(
+                                                        .stop(
                                                           containerId: c.id,
                                                         );
                                                     ShadToaster.of(
@@ -581,7 +475,7 @@ class _ContainerTableState extends State<ContainerTable> {
                                                     ).show(
                                                       const ShadToast(
                                                         description: Text(
-                                                          'Container deleted',
+                                                          'Container stopped',
                                                         ),
                                                       ),
                                                     );
@@ -593,22 +487,88 @@ class _ContainerTableState extends State<ContainerTable> {
                                                     ).show(
                                                       ShadToast(
                                                         description: Text(
-                                                          'Delete failed: $e',
+                                                          'Stop failed: $e',
                                                         ),
                                                       ),
                                                     );
                                                   }
                                                 },
-                                              ),
-                                            ],
-                                          ),
+                                        ),
+
+                                        IconButton(
+                                          icon: const Icon(LucideIcons.trash),
+                                          tooltip: 'Delete',
+                                          onPressed: () async {
+                                            final confirm =
+                                                await showShadDialog<bool>(
+                                                  context: context,
+                                                  builder: (ctx) => ShadDialog(
+                                                    title: const Text(
+                                                      'Delete container?',
+                                                    ),
+                                                    child: Text(
+                                                      'Container ${c.id.substring(0, 12)}',
+                                                    ),
+                                                    actions: [
+                                                      ShadButton.secondary(
+                                                        onPressed: () =>
+                                                            Navigator.pop(
+                                                              ctx,
+                                                              false,
+                                                            ),
+                                                        child: const Text(
+                                                          'Cancel',
+                                                        ),
+                                                      ),
+                                                      ShadButton.destructive(
+                                                        onPressed: () =>
+                                                            Navigator.pop(
+                                                              ctx,
+                                                              true,
+                                                            ),
+                                                        child: const Text(
+                                                          'Delete',
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ) ??
+                                                false;
+                                            if (!confirm) return;
+
+                                            try {
+                                              await widget.client.containers
+                                                  .deleteContainer(
+                                                    containerId: c.id,
+                                                  );
+                                              ShadToaster.of(context).show(
+                                                const ShadToast(
+                                                  description: Text(
+                                                    'Container deleted',
+                                                  ),
+                                                ),
+                                              );
+                                              containersResource.refresh();
+                                            } catch (e) {
+                                              ShadToaster.of(context).show(
+                                                ShadToast(
+                                                  description: Text(
+                                                    'Delete failed: $e',
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                          },
                                         ),
                                       ],
                                     ),
+                                  ),
                                 ],
                               ),
-                            ),
+                          ],
+                        ),
                       ),
+                    ),
             ),
           ],
         );
@@ -724,52 +684,42 @@ class _ConfigureServiceTemplate extends State<ConfigureServiceTemplate> {
             ...widget.spec.variables!.map(
               (v) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child:
-                    v.enumValues == null
-                        ? ShadInputFormField(
-                          label: Text(v.name),
-                          obscureText: v.obscure,
-                          description:
-                              v.description == null
-                                  ? null
-                                  : Text(v.description ?? ''),
+                child: v.enumValues == null
+                    ? ShadInputFormField(
+                        label: Text(v.name),
+                        obscureText: v.obscure,
+                        description: v.description == null
+                            ? null
+                            : Text(v.description ?? ''),
 
-                          validator:
-                              v.optional
-                                  ? null
-                                  : (txt) =>
-                                      (txt.trim().isEmpty)
-                                          ? '${v.name} is required'
-                                          : null,
-                          onChanged:
-                              (txt) => setState(() => _vars[v.name] = txt),
-                        )
-                        : ShadSelectFormField<String>(
-                          label: Text(v.name),
-                          initialValue: v.enumValues![0],
-                          selectedOptionBuilder:
-                              (context, value) => Text(value),
-                          options: [
-                            ...v.enumValues!.map(
-                              (v) =>
-                                  ShadOption<String>(value: v, child: Text(v)),
-                            ),
-                          ],
-                          description:
-                              v.description == null
-                                  ? null
-                                  : Text(v.description ?? ''),
-                          validator:
-                              v.optional
-                                  ? null
-                                  : (txt) =>
-                                      (txt?.trim().isEmpty == true ||
-                                              txt == null)
-                                          ? '${v.name} is required'
-                                          : null,
-                          onChanged:
-                              (txt) => setState(() => _vars[v.name] = txt!),
-                        ),
+                        validator: v.optional
+                            ? null
+                            : (txt) => (txt.trim().isEmpty)
+                                  ? '${v.name} is required'
+                                  : null,
+                        onChanged: (txt) => setState(() => _vars[v.name] = txt),
+                      )
+                    : ShadSelectFormField<String>(
+                        label: Text(v.name),
+                        initialValue: v.enumValues![0],
+                        selectedOptionBuilder: (context, value) => Text(value),
+                        options: [
+                          ...v.enumValues!.map(
+                            (v) => ShadOption<String>(value: v, child: Text(v)),
+                          ),
+                        ],
+                        description: v.description == null
+                            ? null
+                            : Text(v.description ?? ''),
+                        validator: v.optional
+                            ? null
+                            : (txt) =>
+                                  (txt?.trim().isEmpty == true || txt == null)
+                                  ? '${v.name} is required'
+                                  : null,
+                        onChanged: (txt) =>
+                            setState(() => _vars[v.name] = txt!),
+                      ),
               ),
             ),
 
@@ -926,13 +876,11 @@ class _ContainerLogStream extends State<ContainerLogStream> {
 
   @override
   Widget build(BuildContext context) {
-    final inProgress =
-        progress.entries
-            .where(
-              (entry) =>
-                  entry.value.current != null && entry.value.total != null,
-            )
-            .toList();
+    final inProgress = progress.entries
+        .where(
+          (entry) => entry.value.current != null && entry.value.total != null,
+        )
+        .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1132,85 +1080,83 @@ class _PullImage extends State<PullImage> {
       child: SizedBox(
         width: 1000,
         height: 650,
-        child:
-            error != null
-                ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        "$error",
-                        style: TextStyle(
-                          color: ShadTheme.of(context).colorScheme.destructive,
-                        ),
-                      ),
-                      ShadButton(
-                        onPressed: () {
-                          setState(() {
-                            error = null;
-                            logs = null;
-                          });
-                        },
-                        child: Text("Back"),
-                      ),
-                    ],
-                  ),
-                )
-                : logs != null
-                ? ContainerLogStream(logs: logs!)
-                : Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: error != null
+            ? Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(left: 16, top: 16),
-                        child: ShadForm(
-                          key: formKey,
-                          child: Container(
-                            child: Padding(
-                              padding: EdgeInsets.only(top: 16),
-                              child: SingleChildScrollView(
-                                padding: EdgeInsets.only(
-                                  left: 4,
-                                  right: 16,
-                                  bottom: 48,
-                                ),
-                                child: Column(
-                                  spacing: 16,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    ShadInputFormField(
-                                      id: "tag",
-                                      label: Text("image tag"),
-                                      initialValue: "",
-                                      validator:
-                                          (value) =>
-                                              value.isEmpty
-                                                  ? "image tag is required"
-                                                  : null,
-                                    ),
+                    Text(
+                      "$error",
+                      style: TextStyle(
+                        color: ShadTheme.of(context).colorScheme.destructive,
+                      ),
+                    ),
+                    ShadButton(
+                      onPressed: () {
+                        setState(() {
+                          error = null;
+                          logs = null;
+                        });
+                      },
+                      child: Text("Back"),
+                    ),
+                  ],
+                ),
+              )
+            : logs != null
+            ? ContainerLogStream(logs: logs!)
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(left: 16, top: 16),
+                      child: ShadForm(
+                        key: formKey,
+                        child: Container(
+                          child: Padding(
+                            padding: EdgeInsets.only(top: 16),
+                            child: SingleChildScrollView(
+                              padding: EdgeInsets.only(
+                                left: 4,
+                                right: 16,
+                                bottom: 48,
+                              ),
+                              child: Column(
+                                spacing: 16,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ShadInputFormField(
+                                    id: "tag",
+                                    label: Text("image tag"),
+                                    initialValue: "",
+                                    validator: (value) => value.isEmpty
+                                        ? "image tag is required"
+                                        : null,
+                                  ),
 
-                                    Text(
-                                      "registry credentials",
-                                      style:
-                                          ShadTheme.of(context).textTheme.small,
-                                    ),
-                                    DockerSecretsEditor(
-                                      initialSecrets: [],
-                                      onChanged: (c) {
-                                        currentCredentials = c;
-                                      },
-                                    ),
-                                  ],
-                                ),
+                                  Text(
+                                    "registry credentials",
+                                    style: ShadTheme.of(
+                                      context,
+                                    ).textTheme.small,
+                                  ),
+                                  DockerSecretsEditor(
+                                    initialSecrets: [],
+                                    onChanged: (c) {
+                                      currentCredentials = c;
+                                    },
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              ),
       ),
     );
   }

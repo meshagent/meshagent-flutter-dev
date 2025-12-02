@@ -118,49 +118,47 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
               Row(
                 children: [
                   ShadButton.secondary(
-                    leading:
-                        adding
-                            ? SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(),
-                            )
-                            : Icon(LucideIcons.plus),
-                    onPressed:
-                        adding
-                            ? null
-                            : () async {
-                              setState(() {
-                                adding = true;
-                              });
-                              try {
-                                final containerId = await widget.room.containers
-                                    .run(
-                                      image: "ubuntu:latest",
-                                      command: "sleep infinity",
-                                      mountPath: "/data",
-                                    );
+                    leading: adding
+                        ? SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(),
+                          )
+                        : Icon(LucideIcons.plus),
+                    onPressed: adding
+                        ? null
+                        : () async {
+                            setState(() {
+                              adding = true;
+                            });
+                            try {
+                              final containerId = await widget.room.containers
+                                  .run(
+                                    image: "ubuntu:latest",
+                                    command: "sleep infinity",
+                                    mountPath: "/data",
+                                  );
 
-                                final run = await widget.room.containers.exec(
-                                  containerId: containerId,
-                                  command: "bash",
-                                  tty: true,
-                                );
-                                if (!mounted) {
-                                  return;
-                                }
-                                setState(() {
-                                  runs.add(run);
-                                  selectedRun = run;
-                                });
-                              } finally {
-                                if (mounted) {
-                                  setState(() {
-                                    adding = false;
-                                  });
-                                }
+                              final run = await widget.room.containers.exec(
+                                containerId: containerId,
+                                command: "bash",
+                                tty: true,
+                              );
+                              if (!mounted) {
+                                return;
                               }
-                            },
+                              setState(() {
+                                runs.add(run);
+                                selectedRun = run;
+                              });
+                            } finally {
+                              if (mounted) {
+                                setState(() {
+                                  adding = false;
+                                });
+                              }
+                            }
+                          },
                     child: Text("Add Terminal"),
                   ),
                   Spacer(),
@@ -169,29 +167,29 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
               for (final run in runs)
                 Padding(
                   padding: EdgeInsets.only(top: 8),
-                  child: (selectedRun == run
+                  child:
+                      (selectedRun == run
                       ? ShadButton.secondary
                       : ShadButton.ghost)(
-                    onPressed: () {
-                      setState(() {
-                        selectedRun = run;
-                      });
-                    },
-                    child: Text(run.command),
-                  ),
+                        onPressed: () {
+                          setState(() {
+                            selectedRun = run;
+                          });
+                        },
+                        child: Text(run.command),
+                      ),
                 ),
             ],
           ),
         ),
 
         Expanded(
-          child:
-              selectedRun != null
-                  ? ContainerTerminal(
-                    key: ObjectKey(selectedRun),
-                    tty: selectedRun!,
-                  )
-                  : Container(),
+          child: selectedRun != null
+              ? ContainerTerminal(
+                  key: ObjectKey(selectedRun),
+                  tty: selectedRun!,
+                )
+              : Container(),
         ),
       ],
     );
@@ -323,7 +321,9 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                     ],
                   ),
                 ),
-                Expanded(child: ImageTable(client: widget.room, onRun: onRun)),
+                Expanded(
+                  child: ImageTable(client: widget.room, onRun: onRun),
+                ),
               ],
             ),
             DeveloperConsoleView.containers => ContainerTable(
@@ -385,121 +385,108 @@ class _LiveLogsViewerState extends State<LiveLogsViewer> {
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
-      builder:
-          (context, constraints) => Column(
-            children: [
-              Container(
-                clipBehavior: Clip.hardEdge,
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color:
-                          ShadTheme.of(
-                            context,
-                          ).cardTheme.border!.bottom!.color!,
+      builder: (context, constraints) => Column(
+        children: [
+          Container(
+            clipBehavior: Clip.hardEdge,
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: ShadTheme.of(context).cardTheme.border!.bottom!.color!,
+                ),
+              ),
+            ),
+            height: min(50, constraints.maxHeight),
+            child: ShadTable(
+              rowCount: 0,
+              columnCount: 2,
+              pinnedRowCount: 1,
+              columnSpanExtent: (column) =>
+                  column == 0 ? FixedSpanExtent(200) : RemainingSpanExtent(),
+              header: (context, column) => ShadTableCell.header(
+                child: Text(
+                  columnNames[column],
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              builder: (context, viscinity) {
+                if (viscinity.column == 0) {
+                  return ShadTableCell(
+                    child: Text(
+                      events[viscinity.row].name,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                } else {
+                  return ShadTableCell(
+                    child: Text(
+                      events[viscinity.row].description,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }
+              },
+            ),
+          ),
+          Expanded(
+            child: (events.isEmpty)
+                ? SizedBox()
+                : ScrollbarTheme(
+                    data: ScrollbarThemeData(
+                      crossAxisMargin: 5,
+                      mainAxisMargin: 5,
+                    ),
+                    child: Scrollbar(
+                      trackVisibility: false,
+                      thumbVisibility: true,
+                      controller: verticalScrollController,
+                      scrollbarOrientation: ScrollbarOrientation.right,
+                      child: ShadTable(
+                        verticalScrollController: verticalScrollController,
+                        rowCount: events.length,
+                        columnCount: 2,
+                        pinnedRowCount: 0,
+                        columnSpanExtent: (column) => column == 0
+                            ? FixedSpanExtent(200)
+                            : RemainingSpanExtent(),
+                        builder: (context, viscinity) {
+                          if (viscinity.column == 0) {
+                            return ShadTableCell(
+                              child: Text(
+                                events[viscinity.row].name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          } else {
+                            return ShadTableCell(
+                              child: ShadContextMenuRegion(
+                                items: [
+                                  ShadContextMenuItem(
+                                    onPressed: () {
+                                      Clipboard.setData(
+                                        ClipboardData(
+                                          text:
+                                              events[viscinity.row].description,
+                                        ),
+                                      );
+                                    },
+                                    child: Text("Copy Description"),
+                                  ),
+                                ],
+                                child: Text(
+                                  events[viscinity.row].description,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      ),
                     ),
                   ),
-                ),
-                height: min(50, constraints.maxHeight),
-                child: ShadTable(
-                  rowCount: 0,
-                  columnCount: 2,
-                  pinnedRowCount: 1,
-                  columnSpanExtent:
-                      (column) =>
-                          column == 0
-                              ? FixedSpanExtent(200)
-                              : RemainingSpanExtent(),
-                  header:
-                      (context, column) => ShadTableCell.header(
-                        child: Text(
-                          columnNames[column],
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                  builder: (context, viscinity) {
-                    if (viscinity.column == 0) {
-                      return ShadTableCell(
-                        child: Text(
-                          events[viscinity.row].name,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    } else {
-                      return ShadTableCell(
-                        child: Text(
-                          events[viscinity.row].description,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }
-                  },
-                ),
-              ),
-              Expanded(
-                child:
-                    (events.isEmpty)
-                        ? SizedBox()
-                        : ScrollbarTheme(
-                          data: ScrollbarThemeData(
-                            crossAxisMargin: 5,
-                            mainAxisMargin: 5,
-                          ),
-                          child: Scrollbar(
-                            trackVisibility: false,
-                            thumbVisibility: true,
-                            controller: verticalScrollController,
-                            scrollbarOrientation: ScrollbarOrientation.right,
-                            child: ShadTable(
-                              verticalScrollController:
-                                  verticalScrollController,
-                              rowCount: events.length,
-                              columnCount: 2,
-                              pinnedRowCount: 0,
-                              columnSpanExtent:
-                                  (column) =>
-                                      column == 0
-                                          ? FixedSpanExtent(200)
-                                          : RemainingSpanExtent(),
-                              builder: (context, viscinity) {
-                                if (viscinity.column == 0) {
-                                  return ShadTableCell(
-                                    child: Text(
-                                      events[viscinity.row].name,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  );
-                                } else {
-                                  return ShadTableCell(
-                                    child: ShadContextMenuRegion(
-                                      items: [
-                                        ShadContextMenuItem(
-                                          onPressed: () {
-                                            Clipboard.setData(
-                                              ClipboardData(
-                                                text:
-                                                    events[viscinity.row]
-                                                        .description,
-                                              ),
-                                            );
-                                          },
-                                          child: Text("Copy Description"),
-                                        ),
-                                      ],
-                                      child: Text(
-                                        events[viscinity.row].description,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  );
-                                }
-                              },
-                            ),
-                          ),
-                        ),
-              ),
-            ],
           ),
+        ],
+      ),
     );
   }
 }

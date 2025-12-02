@@ -29,14 +29,9 @@ TextSpan ansiToTextSpan(String source, {TextStyle? baseStyle}) {
       );
     }
 
-    final params =
-        m[2]!.isEmpty
-            ? <int>[0]
-            : m[2]!
-                .split(';')
-                .where((s) => s.isNotEmpty)
-                .map(int.parse)
-                .toList();
+    final params = m[2]!.isEmpty
+        ? <int>[0]
+        : m[2]!.split(';').where((s) => s.isNotEmpty).map(int.parse).toList();
     _applySgr(params, (t) => current = t(current)); // mutates `current`
 
     last = m.end;
