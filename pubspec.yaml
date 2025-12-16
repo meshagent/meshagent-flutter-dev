@@ -39,6 +39,8 @@ dependencies:
   super_sliver_list: ^0.4.1
   meshagent: ^0.13.0
   meshagent_flutter: ^0.13.0
+  meshagent_flutter_widgets: ^0.13.0
+  meshagent_luau: ^0.13.0
   xterm: ^4.0.0
   stream_transform: ^2.1.1
 

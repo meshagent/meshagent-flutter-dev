@@ -2,8 +2,12 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:meshagent/room_server_client.dart';
+import 'package:meshagent_flutter_widgets/widgets.dart';
+import 'package:meshagent_luau/meshagent_luau.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:super_sliver_list/super_sliver_list.dart';
 import './terminal.dart';
 import "./trace_viewer.dart";
 import 'package:stream_transform/stream_transform.dart';
@@ -67,6 +71,7 @@ enum DeveloperConsoleView {
   metrics,
   terminal,
   containers,
+  widgets,
   images,
 }
 
@@ -235,7 +240,26 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
               SizedBox(width: 15),
 
               SizedBox(
-                width: 500,
+                width: 100,
+                child: ShadTabs<DeveloperConsoleView>(
+                  value: view,
+                  onChanged: (value) {
+                    setState(() {
+                      view = value;
+                    });
+                  },
+                  tabs: [
+                    ShadTab(
+                      value: DeveloperConsoleView.widgets,
+                      child: Text("Widgets"),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(width: 15),
+              SizedBox(
+                width: 300,
                 child: ShadTabs<DeveloperConsoleView>(
                   value: view,
                   onChanged: (value) {
@@ -329,6 +353,8 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
             DeveloperConsoleView.containers => ContainerTable(
               client: widget.room,
             ),
+
+            DeveloperConsoleView.widgets => LuauConsoleViewer(),
           },
         ),
       ],
@@ -485,6 +511,41 @@ class _LiveLogsViewerState extends State<LiveLogsViewer> {
                     ),
                   ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class LuauConsoleViewer extends StatefulWidget {
+  LuauConsoleViewer({super.key});
+
+  @override
+  State createState() => _LuauConsoleViewer();
+}
+
+class _LuauConsoleViewer extends State<LuauConsoleViewer> {
+  final scrollController = ScrollController();
+  @override
+  Widget build(BuildContext context) {
+    final console = LuauConsole.of(context);
+
+    if (console.consoleEntries.length == 0) {
+      return SizedBox();
+    }
+
+    return SelectionArea(
+      child: SuperListView(
+        controller: scrollController,
+        padding: const EdgeInsets.all(20.0),
+        children: [
+          for (final entry in console.consoleEntries)
+            Text(
+              "${entry.scriptName}:${entry.lineNumber}: ${entry.spans.join("\n")}",
+              style: entry.type == ConsoleEntryType.error
+                  ? GoogleFonts.sourceCodePro(color: Colors.red)
+                  : GoogleFonts.sourceCodePro(),
+            ),
         ],
       ),
     );
