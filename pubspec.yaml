@@ -31,8 +31,6 @@ resolution: workspace
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
-  flutter:
-    sdk: flutter
   shadcn_ui: ^0.42.0
   lucide_icons_flutter: ^3.1.1
   google_fonts: ^6.2.1
