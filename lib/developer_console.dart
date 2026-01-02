@@ -352,6 +352,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
             ),
             DeveloperConsoleView.containers => ContainerTable(
               client: widget.room,
+              onRun: onRun,
             ),
 
             DeveloperConsoleView.widgets => LuauConsoleViewer(),

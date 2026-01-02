@@ -9,6 +9,48 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:flutter_solidart/flutter_solidart.dart';
 
+Future<String?> promptForCommand(BuildContext context) async {
+  String messageText = "/bin/bash -il";
+  return await showShadDialog(
+    context: context,
+    builder: (context) => ShadDialog.alert(
+      actions: [
+        ShadButton.secondary(
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: Text("Cancel"),
+        ),
+        ShadButton(
+          onPressed: () {
+            Navigator.of(context).pop(messageText);
+          },
+          child: Text("Send"),
+        ),
+      ],
+      title: Text("Launch Terminal"),
+      description: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: 400),
+        child: ShadInputFormField(
+          initialValue: "/bin/bash -il",
+          description: Text(
+            "Enter an interactive terminal command to launch it in a terminal",
+          ),
+          onChanged: (value) {
+            messageText = value;
+          },
+          textAlign: TextAlign.start,
+
+          style: GoogleFonts.sourceCodePro(
+            color: Color.from(alpha: 1, red: .8, green: .8, blue: .8),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 class ImageTable extends StatefulWidget {
   const ImageTable({super.key, required this.client, required this.onRun});
 
@@ -95,6 +137,11 @@ class _ImageTableState extends State<ImageTable> {
                         tooltip: 'Run',
                         onPressed: () async {
                           try {
+                            final command = await promptForCommand(context);
+                            if (command == null) {
+                              return;
+                            }
+
                             final containerId = await widget.client.containers
                                 .run(
                                   command: "sleep infinity",
@@ -106,7 +153,7 @@ class _ImageTableState extends State<ImageTable> {
                             final tty = widget.client.containers.exec(
                               containerId: containerId,
                               tty: true,
-                              command: "/bin/bash -il",
+                              command: command,
                             );
 
                             if (!mounted) return;
@@ -218,7 +265,9 @@ class _ImageTableState extends State<ImageTable> {
 
 /// Pass your existing ContainersClient instance.
 class ContainerTable extends StatefulWidget {
-  const ContainerTable({super.key, required this.client});
+  const ContainerTable({super.key, required this.client, required this.onRun});
+
+  final void Function(ContainerRun run) onRun;
 
   final RoomClient client;
 
@@ -292,6 +341,7 @@ class _ContainerTableState extends State<ContainerTable> {
                         scrollDirection: Axis.vertical,
                         child: DataTable(
                           columns: const [
+                            DataColumn(label: Text("")),
                             DataColumn(label: Text('Status')),
                             DataColumn(label: Text('Name')),
                             DataColumn(label: Text('Image')),
@@ -302,6 +352,48 @@ class _ContainerTableState extends State<ContainerTable> {
                             for (final c in containersResource.state.value!)
                               DataRow(
                                 cells: [
+                                  DataCell(
+                                    IconButton(
+                                      icon: const Icon(LucideIcons.play),
+                                      tooltip: 'Run',
+                                      onPressed: () async {
+                                        try {
+                                          final command =
+                                              await promptForCommand(context);
+                                          if (command == null) {
+                                            return;
+                                          }
+                                          final tty = widget.client.containers
+                                              .exec(
+                                                containerId: c.id,
+                                                tty: true,
+                                                command: command,
+                                              );
+
+                                          if (!mounted) return;
+
+                                          widget.onRun(tty);
+
+                                          ShadToaster.of(context).show(
+                                            const ShadToast(
+                                              description: Text(
+                                                'Starting container',
+                                              ),
+                                            ),
+                                          );
+                                        } catch (e) {
+                                          ShadToaster.of(context).show(
+                                            ShadToast(
+                                              description: Text(
+                                                'Unable to start container: $e',
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                    ),
+                                  ),
+
                                   DataCell(Text(c.state)),
                                   DataCell(
                                     Text(c.name ?? "", style: TextStyle()),
