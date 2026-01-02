@@ -95,78 +95,23 @@ class _ImageTableState extends State<ImageTable> {
                         tooltip: 'Run',
                         onPressed: () async {
                           try {
-                            Map<String, String>? vars;
-                            if (img.manifest != null) {
-                              vars = await showShadDialog(
-                                context: context,
-                                builder: (context) =>
-                                    ConfigureServiceTemplateDialog(
-                                      spec: img.manifest!,
-                                      actionsBuilder:
-                                          (context, variables, validate) {
-                                            bool _ready = variables.values
-                                                .every(
-                                                  (v) => v.trim().isNotEmpty,
-                                                );
+                            final containerId = await widget.client.containers
+                                .run(
+                                  command: "sleep infinity",
+                                  image: img.tags.isNotEmpty
+                                      ? img.tags.first
+                                      : img.id,
+                                );
 
-                                            return [
-                                              Expanded(
-                                                child: ShadButton.destructive(
-                                                  enabled: _ready,
-                                                  onPressed: () {
-                                                    Navigator.of(context).pop();
-                                                  },
-                                                  child: const Text('Deny'),
-                                                ),
-                                              ),
-                                              Expanded(
-                                                child: ShadButton(
-                                                  enabled: _ready,
-                                                  onPressed: () {
-                                                    if (validate()) {
-                                                      Navigator.of(
-                                                        context,
-                                                      ).pop(variables);
-                                                    }
-                                                  },
-                                                  child: const Text('Allow'),
-                                                ),
-                                              ),
-                                            ];
-                                          },
-                                    ),
-                              );
+                            final tty = widget.client.containers.exec(
+                              containerId: containerId,
+                              tty: true,
+                              command: "/bin/bash -il",
+                            );
 
-                              if (vars == null) {
-                                return;
-                              }
+                            if (!mounted) return;
 
-                              widget.client.containers.run(
-                                image: img.tags.isNotEmpty
-                                    ? img.tags.first
-                                    : img.id,
-                                variables: vars,
-                              );
-                            } else {
-                              final containerId = await widget.client.containers
-                                  .run(
-                                    command: "sleep infinity",
-                                    image: img.tags.isNotEmpty
-                                        ? img.tags.first
-                                        : img.id,
-                                    variables: vars,
-                                  );
-
-                              final tty = widget.client.containers.exec(
-                                containerId: containerId,
-                                tty: true,
-                                command: "/bin/bash -il",
-                              );
-
-                              if (!mounted) return;
-
-                              widget.onRun(tty);
-                            }
+                            widget.onRun(tty);
 
                             ShadToaster.of(context).show(
                               const ShadToast(
@@ -186,23 +131,17 @@ class _ImageTableState extends State<ImageTable> {
                         },
                       ),
                     ),
+
                     DataCell(
                       Row(
                         children: [
-                          img.manifest != null
-                              ? Icon(LucideIcons.bot, color: Colors.green)
-                              : Icon(LucideIcons.disc),
                           SizedBox(width: 10),
                           Expanded(
                             child: SelectableText(
                               img.tags.isNotEmpty
                                   ? img.tags.first
                                   : '(untagged)',
-                              style: TextStyle(
-                                color: img.manifest != null
-                                    ? Colors.green
-                                    : null,
-                              ),
+                              style: TextStyle(),
                             ),
                           ),
                         ],
@@ -354,6 +293,7 @@ class _ContainerTableState extends State<ContainerTable> {
                         child: DataTable(
                           columns: const [
                             DataColumn(label: Text('Status')),
+                            DataColumn(label: Text('Name')),
                             DataColumn(label: Text('Image')),
                             DataColumn(label: Text('Started by')),
                             DataColumn(label: Text('')), // stop‑button column
@@ -364,6 +304,9 @@ class _ContainerTableState extends State<ContainerTable> {
                                 cells: [
                                   DataCell(Text(c.state)),
                                   DataCell(
+                                    Text(c.name ?? "", style: TextStyle()),
+                                  ),
+                                  DataCell(
                                     ConstrainedBox(
                                       constraints: BoxConstraints(
                                         maxWidth: constraints.maxWidth * .75,
@@ -372,23 +315,12 @@ class _ContainerTableState extends State<ContainerTable> {
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         [c.image].join(' '),
-                                        style: TextStyle(
-                                          color: c.manifest != null
-                                              ? Colors.green
-                                              : null,
-                                        ),
+                                        style: TextStyle(color: null),
                                       ),
                                     ),
                                   ),
                                   DataCell(
-                                    Text(
-                                      c.startedBy.name,
-                                      style: TextStyle(
-                                        color: c.manifest != null
-                                            ? Colors.green
-                                            : null,
-                                      ),
-                                    ),
+                                    Text(c.startedBy.name, style: TextStyle()),
                                   ),
                                   DataCell(
                                     Row(
