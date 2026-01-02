@@ -401,6 +401,7 @@ class _ContainerTableState extends State<ContainerTable> {
                                             showShadDialog(
                                               context: context,
                                               builder: (context) => ShadDialog(
+                                                scrollable: false,
                                                 constraints: BoxConstraints(
                                                   minWidth: 1024,
                                                   minHeight: 600,
