@@ -128,7 +128,7 @@ class _RoomTerminal extends State<RoomTerminal> {
 class ContainerTerminal extends StatefulWidget {
   const ContainerTerminal({super.key, required this.tty});
 
-  final ContainerRun tty;
+  final ExecSession tty;
 
   @override
   State createState() => _ContainerTerminal();

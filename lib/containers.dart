@@ -55,7 +55,7 @@ class ImageTable extends StatefulWidget {
   const ImageTable({super.key, required this.client, required this.onRun});
 
   final RoomClient client;
-  final void Function(ContainerRun run) onRun;
+  final void Function(ExecSession run) onRun;
 
   @override
   State<ImageTable> createState() => _ImageTableState();
@@ -267,7 +267,7 @@ class _ImageTableState extends State<ImageTable> {
 class ContainerTable extends StatefulWidget {
   const ContainerTable({super.key, required this.client, required this.onRun});
 
-  final void Function(ContainerRun run) onRun;
+  final void Function(ExecSession run) onRun;
 
   final RoomClient client;
 

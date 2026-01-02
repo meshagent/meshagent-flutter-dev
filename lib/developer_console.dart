@@ -96,10 +96,10 @@ class RoomDeveloperConsole extends StatefulWidget {
 class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
   var view = DeveloperConsoleView.logs;
 
-  ContainerRun? selectedRun;
-  final List<ContainerRun> runs = [];
+  ExecSession? selectedRun;
+  final List<ExecSession> runs = [];
 
-  void onRun(ContainerRun run) {
+  void onRun(ExecSession run) {
     if (!mounted) {
       return;
     }
