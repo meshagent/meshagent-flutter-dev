@@ -236,65 +236,151 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            spanTooltip(
-              node,
-              ShadButton.link(
-                hoverForegroundColor: node.status?.code == "STATUS_CODE_ERROR"
-                    ? Colors.red
-                    : null,
-                foregroundColor: node.status?.code == "STATUS_CODE_ERROR"
-                    ? Colors.red
-                    : null,
-                onTapDown: (_) {
-                  setState(() {
-                    expanded = !expanded;
-                  });
-                },
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.only(right: 10),
-                      child:
-                          (widget.spans
-                              .getChildren(widget.node.spanId)
-                              .isNotEmpty)
-                          ? Icon(
-                              expanded
-                                  ? LucideIcons.chevronDown
-                                  : LucideIcons.chevronRight,
-                            )
-                          : Icon(LucideIcons.dot),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.only(right: 10),
-                      child: switch (node.status?.code) {
-                        "STATUS_CODE_ERROR" => Icon(
-                          LucideIcons.bug,
-                          color: Colors.red,
-                        ),
-                        _ => Icon(
-                          LucideIcons.clock,
-                          color: ShadTheme.of(context).colorScheme.foreground,
-                        ),
-                      },
-                    ),
-                    SizedBox(
-                      width: 300 - widget.depth * 20,
-                      child: Text(
-                        duration == 0
-                            ? node.name
-                            : "${node.name} (${duration}s)",
-                        maxLines: 1,
-                        textAlign: TextAlign.start,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ShadButton.link(
+                  hoverForegroundColor: node.status?.code == "STATUS_CODE_ERROR"
+                      ? Colors.red
+                      : null,
+                  foregroundColor: node.status?.code == "STATUS_CODE_ERROR"
+                      ? Colors.red
+                      : null,
+                  onTapDown: (_) {
+                    setState(() {
+                      expanded = !expanded;
+                    });
+                  },
+                  child: Padding(
+                    padding: EdgeInsets.only(right: 10),
+                    child:
+                        (widget.spans
+                            .getChildren(widget.node.spanId)
+                            .isNotEmpty)
+                        ? Icon(
+                            expanded
+                                ? LucideIcons.chevronDown
+                                : LucideIcons.chevronRight,
+                          )
+                        : Icon(LucideIcons.dot),
+                  ),
                 ),
-              ),
+                Padding(
+                  padding: EdgeInsets.only(right: 10),
+                  child: switch (node.status?.code) {
+                    "STATUS_CODE_ERROR" => Icon(
+                      LucideIcons.bug,
+                      color: Colors.red,
+                    ),
+                    _ => Icon(
+                      LucideIcons.clock,
+                      color: ShadTheme.of(context).colorScheme.foreground,
+                    ),
+                  },
+                ),
+                SizedBox(
+                  width: 300 - widget.depth * 20,
+                  child: GestureDetector(
+                    onTap: () {
+                      showShadSheet(
+                        side: ShadSheetSide.right,
+                        context: context,
+                        builder: (context) => ShadSheet(
+                          title: Text("Span Details"),
+                          constraints: BoxConstraints(
+                            minWidth: 500,
+                            maxWidth: 500,
+                          ),
+                          child: SelectionArea(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text.rich(
+                                  TextSpan(
+                                    children: [
+                                      TextSpan(
+                                        text: "timestamp: ",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      TextSpan(
+                                        text: DateFormat.yMMMMEEEEd()
+                                            .add_jm()
+                                            .format(
+                                              DateTime.fromMicrosecondsSinceEpoch(
+                                                (node.startTimeUnixNano / 1000)
+                                                    .toInt(),
+                                                isUtc: true,
+                                              ).toLocal(),
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text.rich(
+                                  TextSpan(
+                                    children: [
+                                      TextSpan(
+                                        text: "duration: ",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      TextSpan(
+                                        text:
+                                            "${Duration(microseconds: ((node.endTimeUnixNano - node.startTimeUnixNano) / 1000).toInt()).inMilliseconds} ms",
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text.rich(
+                                  TextSpan(
+                                    children: [
+                                      TextSpan(
+                                        text: "name: ",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      TextSpan(text: node.name),
+                                    ],
+                                  ),
+                                ),
+
+                                for (final attribute in node.attributes)
+                                  Text.rich(
+                                    TextSpan(
+                                      children: [
+                                        TextSpan(
+                                          text: "${attribute.key}: ",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        TextSpan(text: "${attribute.value}"),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      duration == 0 ? node.name : "${node.name} (${duration}s)",
+                      maxLines: 1,
+                      textAlign: TextAlign.start,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
             ),
+
             Expanded(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
