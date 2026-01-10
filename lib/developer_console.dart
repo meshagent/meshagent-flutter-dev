@@ -149,10 +149,15 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                                       (widget.room.protocol.channel
                                               as WebSocketProtocolChannel)
                                           .jwt,
+                                  "MESHAGENT_SESSION_TOKEN":
+                                      (widget.room.protocol.channel
+                                              as WebSocketProtocolChannel)
+                                          .jwt,
                                 },
+                                private: true,
                               );
 
-                              final run = await widget.room.containers.exec(
+                              final run = widget.room.containers.exec(
                                 containerId: containerId,
                                 command: "bash",
                                 tty: true,
@@ -178,19 +183,38 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                 ],
               ),
               for (final run in runs)
-                Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child:
-                      (selectedRun == run
-                      ? ShadButton.secondary
-                      : ShadButton.ghost)(
+                Row(
+                  spacing: 8,
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child:
+                            (selectedRun == run
+                            ? ShadButton.secondary
+                            : ShadButton.ghost)(
+                              onPressed: () {
+                                setState(() {
+                                  selectedRun = run;
+                                });
+                              },
+                              child: Text(run.command),
+                            ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: ShadButton.ghost(
                         onPressed: () {
                           setState(() {
-                            selectedRun = run;
+                            run.stop();
+                            runs.remove(run);
                           });
                         },
-                        child: Text(run.command),
+                        child: Icon(LucideIcons.x),
                       ),
+                    ),
+                  ],
                 ),
             ],
           ),

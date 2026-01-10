@@ -396,7 +396,19 @@ class _ContainerTableState extends State<ContainerTable> {
 
                                   DataCell(Text(c.state)),
                                   DataCell(
-                                    Text(c.name ?? "", style: TextStyle()),
+                                    Row(
+                                      spacing: 8,
+                                      children: [
+                                        if (c.private)
+                                          Icon(LucideIcons.lock, size: 16),
+                                        Expanded(
+                                          child: Text(
+                                            c.name ?? "",
+                                            style: TextStyle(),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                   DataCell(
                                     ConstrainedBox(

@@ -150,8 +150,26 @@ class _ContainerTerminal extends State<ContainerTerminal> {
     }
 
     watch();
+
+    widget.tty.result
+        .then((result) {
+          if (mounted) {
+            setState(() {
+              closed = true;
+            });
+          }
+        })
+        .catchError((e) {
+          if (mounted) {
+            setState(() {
+              closed = true;
+              error = e;
+            });
+          }
+        });
   }
 
+  Object? error;
   bool closed = false;
 
   @override
@@ -185,6 +203,18 @@ class _ContainerTerminal extends State<ContainerTerminal> {
   @override
   Widget build(BuildContext context) {
     if (closed) {
+      if (error != null) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text("Terminal Session Ended"),
+
+              Text("${error}", style: TextStyle(color: Colors.red)),
+            ],
+          ),
+        );
+      }
       return Center(child: Text("Terminal Session Ended"));
     }
 
