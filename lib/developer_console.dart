@@ -3,6 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:meshagent/meshagent.dart';
 import 'package:meshagent/room_server_client.dart';
 import 'package:meshagent_flutter_widgets/widgets.dart';
 import 'package:meshagent_luau/meshagent_luau.dart';
@@ -137,12 +138,19 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                               adding = true;
                             });
                             try {
-                              final containerId = await widget.room.containers
-                                  .run(
-                                    image: "ubuntu:latest",
-                                    command: "sleep infinity",
-                                    mountPath: "/data",
-                                  );
+                              final containerId = await widget.room.containers.run(
+                                image:
+                                    "${const String.fromEnvironment("IMAGE_TAG_PREFIX")}cli:{SERVER_VERSION}-esgz",
+                                command: "sleep infinity",
+                                mountPath: "/data",
+                                writableRootFs: true,
+                                env: {
+                                  "OPENAI_API_KEY":
+                                      (widget.room.protocol.channel
+                                              as WebSocketProtocolChannel)
+                                          .jwt,
+                                },
+                              );
 
                               final run = await widget.room.containers.exec(
                                 containerId: containerId,
