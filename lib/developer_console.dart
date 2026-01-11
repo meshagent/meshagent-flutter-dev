@@ -234,7 +234,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
           child: selectedRun != null
               ? ContainerTerminal(
                   key: ObjectKey(selectedRun),
-                  tty: selectedRun!,
+                  session: selectedRun!,
                 )
               : Container(),
         ),

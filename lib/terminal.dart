@@ -126,9 +126,9 @@ class _RoomTerminal extends State<RoomTerminal> {
 }
 
 class ContainerTerminal extends StatefulWidget {
-  const ContainerTerminal({super.key, required this.tty});
+  const ContainerTerminal({super.key, required this.session});
 
-  final ExecSession tty;
+  final ExecSession session;
 
   @override
   State createState() => _ContainerTerminal();
@@ -140,18 +140,18 @@ class _ContainerTerminal extends State<ContainerTerminal> {
     super.initState();
     terminal = Terminal(
       onOutput: (data) {
-        widget.tty.write(utf8.encode(data));
+        widget.session.write(utf8.encode(data));
       },
       onResize: onResize,
     );
-    for (final line in widget.tty.previousOutput) {
+    for (final line in widget.session.previousOutput) {
       final text = utf8.decode(line);
       terminal.write(text);
     }
 
     watch();
 
-    widget.tty.result
+    widget.session.result
         .then((result) {
           if (mounted) {
             setState(() {
@@ -179,7 +179,7 @@ class _ContainerTerminal extends State<ContainerTerminal> {
   }
 
   void watch() {
-    subStdout = widget.tty.output.listen(onData);
+    subStdout = widget.session.output.listen(onData);
   }
 
   void onData(data) {
@@ -194,7 +194,9 @@ class _ContainerTerminal extends State<ContainerTerminal> {
   late final Terminal terminal;
 
   void onResize(int width, int height, _, __) {
-    widget.tty.resize(width: width, height: height);
+    if (!widget.session.closed) {
+      widget.session.resize(width: width, height: height).catchError((err) {});
+    }
   }
 
   int width = 0;
