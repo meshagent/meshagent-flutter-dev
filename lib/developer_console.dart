@@ -84,8 +84,10 @@ class RoomDeveloperConsole extends StatefulWidget {
     required this.events,
     required this.room,
     required this.pricing,
+    required this.shellImage,
   });
 
+  final String shellImage;
   final Map<String, dynamic>? pricing;
   final RoomClient room;
   final List<RoomEvent> events;
@@ -138,24 +140,24 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                               adding = true;
                             });
                             try {
-                              final containerId = await widget.room.containers.run(
-                                image:
-                                    "${const String.fromEnvironment("IMAGE_TAG_PREFIX")}cli:{SERVER_VERSION}-esgz",
-                                command: "sleep infinity",
-                                mountPath: "/data",
-                                writableRootFs: true,
-                                env: {
-                                  "OPENAI_API_KEY":
-                                      (widget.room.protocol.channel
-                                              as WebSocketProtocolChannel)
-                                          .jwt,
-                                  "MESHAGENT_SESSION_TOKEN":
-                                      (widget.room.protocol.channel
-                                              as WebSocketProtocolChannel)
-                                          .jwt,
-                                },
-                                private: true,
-                              );
+                              final containerId = await widget.room.containers
+                                  .run(
+                                    image: widget.shellImage,
+                                    command: "sleep infinity",
+                                    mountPath: "/data",
+                                    writableRootFs: true,
+                                    env: {
+                                      "OPENAI_API_KEY":
+                                          (widget.room.protocol.channel
+                                                  as WebSocketProtocolChannel)
+                                              .jwt,
+                                      "MESHAGENT_SESSION_TOKEN":
+                                          (widget.room.protocol.channel
+                                                  as WebSocketProtocolChannel)
+                                              .jwt,
+                                    },
+                                    private: true,
+                                  );
 
                               final run = widget.room.containers.exec(
                                 containerId: containerId,
@@ -169,6 +171,14 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                                 runs.add(run);
                                 selectedRun = run;
                               });
+                            } on RoomServerException catch (err) {
+                              showShadDialog(
+                                context: context,
+                                builder: (context) => ShadDialog.alert(
+                                  title: Text("Unable to run container"),
+                                  description: Text("$err"),
+                                ),
+                              );
                             } finally {
                               if (mounted) {
                                 setState(() {
