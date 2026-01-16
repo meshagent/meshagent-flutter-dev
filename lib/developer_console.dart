@@ -151,7 +151,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                                           (widget.room.protocol.channel
                                                   as WebSocketProtocolChannel)
                                               .jwt,
-                                      "MESHAGENT_SESSION_TOKEN":
+                                      "MESHAGENT_TOKEN":
                                           (widget.room.protocol.channel
                                                   as WebSocketProtocolChannel)
                                               .jwt,
