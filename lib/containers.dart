@@ -148,6 +148,7 @@ class _ImageTableState extends State<ImageTable> {
                                   image: img.tags.isNotEmpty
                                       ? img.tags.first
                                       : img.id,
+                                  writableRootFs: true,
                                 );
 
                             final tty = widget.client.containers.exec(
