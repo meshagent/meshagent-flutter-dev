@@ -161,7 +161,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
 
                               final run = widget.room.containers.exec(
                                 containerId: containerId,
-                                command: "bash",
+                                command: "bash -l",
                                 tty: true,
                               );
                               if (!mounted) {
