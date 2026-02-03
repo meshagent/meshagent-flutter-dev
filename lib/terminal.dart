@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:meshagent/meshagent.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:xterm/xterm.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -217,7 +218,6 @@ class _ContainerTerminal extends State<ContainerTerminal> {
           ),
         );
       }
-      return Center(child: Text("Terminal Session Ended"));
     }
 
     return LayoutBuilder(
@@ -227,6 +227,9 @@ class _ContainerTerminal extends State<ContainerTerminal> {
           textStyle: TerminalStyle(
             fontFamily: GoogleFonts.sourceCodePro(
               fontWeight: FontWeight.w500,
+              color: closed
+                  ? ShadTheme.of(context).colorScheme.foreground.withAlpha(100)
+                  : ShadTheme.of(context).colorScheme.foreground,
             ).fontFamily!,
             fontSize: 15,
           ),
