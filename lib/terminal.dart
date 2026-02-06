@@ -180,14 +180,21 @@ class _ContainerTerminal extends State<ContainerTerminal> {
   }
 
   void watch() {
-    subStdout = widget.session.output.listen(onData);
+    subStdout = widget.session.output.listen(
+      onData,
+      onError: (e, st) {
+        // log it, but don't lose the terminal
+        debugPrint("terminal output decode error: $e");
+      },
+      cancelOnError: false,
+    );
   }
 
-  void onData(data) {
-    if (data is Uint8List) {
-      final text = utf8.decode(data);
-      terminal.write(text);
-    }
+  final _decoder = const Utf8Decoder(allowMalformed: true);
+
+  void onData(Uint8List data) {
+    final text = _decoder.convert(data);
+    terminal.write(text);
   }
 
   late final StreamSubscription subStdout;
