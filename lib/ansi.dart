@@ -12,6 +12,7 @@ import 'package:flutter/widgets.dart';
 /// ```
 
 TextSpan ansiToTextSpan(String source, {TextStyle? baseStyle}) {
+  source = _normalizeControlChars(source);
   // 1⃣  Remove cursor‑movement / clear‑screen sequences we can’t show.
   source = _stripNonSgrCsi(source);
 
@@ -60,6 +61,60 @@ String _stripNonSgrCsi(String s) {
   //     Terminates with BEL (␇) **or** ST (␛ \).
   final oscLike = RegExp(r'\x1B[][PX^_].*?(?:\x07|\x1B\\)', dotAll: true);
   return s.replaceAll(oscLike, '');
+}
+
+String _normalizeControlChars(String s) {
+  final out = <int>[];
+  var cursor = 0;
+
+  void insertAtCursor(int code) {
+    if (cursor == out.length) {
+      out.add(code);
+    } else {
+      out.insert(cursor, code);
+    }
+    cursor++;
+  }
+
+  void insertCaretControl(int code) {
+    insertAtCursor(0x5E); // ^
+    final caret = code == 0x7F ? 0x3F : (code + 0x40);
+    insertAtCursor(caret);
+  }
+
+  for (final code in s.codeUnits) {
+    switch (code) {
+      case 0x08: // backspace
+        if (cursor > 0) {
+          cursor--;
+          out.removeAt(cursor);
+        }
+        break;
+      case 0x0D: // carriage return
+        cursor = 0;
+        break;
+      default:
+        if ((code < 0x20 || code == 0x7F) && code != 0x1B) {
+          if (code == 0x0A || code == 0x09) {
+            insertAtCursor(code);
+          }
+          if (code != 0x0A && code != 0x09) {
+            insertCaretControl(code);
+          }
+          break;
+        }
+
+        if (cursor == out.length) {
+          out.add(code);
+        } else {
+          out[cursor] = code;
+        }
+        cursor++;
+        break;
+    }
+  }
+
+  return String.fromCharCodes(out);
 }
 
 /// Mutates the current [TextStyle] according to SGR parameters.

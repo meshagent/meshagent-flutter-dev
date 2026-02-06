@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:meshagent/meshagent.dart';
+import './ansi.dart';
 
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
@@ -919,6 +920,11 @@ class _ContainerLogStream extends State<ContainerLogStream> {
           (entry) => entry.value.current != null && entry.value.total != null,
         )
         .toList();
+    final baseStyle = GoogleFonts.sourceCodePro(
+      fontWeight: FontWeight.w500,
+      fontSize: 12,
+      color: ShadTheme.of(context).colorScheme.foreground,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -935,14 +941,7 @@ class _ContainerLogStream extends State<ContainerLogStream> {
                 padding: EdgeInsets.all(24),
                 children: [
                   for (final l in logs)
-                    Text(
-                      l,
-                      style: GoogleFonts.sourceCodePro(
-                        fontWeight: FontWeight.w500,
-                        fontSize: 12,
-                        color: ShadTheme.of(context).colorScheme.foreground,
-                      ),
-                    ),
+                    Text.rich(ansiToTextSpan(l, baseStyle: baseStyle)),
                 ],
               ),
             ),
