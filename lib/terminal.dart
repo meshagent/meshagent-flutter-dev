@@ -228,7 +228,7 @@ class _ContainerTerminal extends State<ContainerTerminal> {
             fontFamily: GoogleFonts.sourceCodePro(
               fontWeight: FontWeight.w500,
               color: closed
-                  ? ShadTheme.of(context).colorScheme.foreground.withAlpha(100)
+                  ? ShadTheme.of(context).colorScheme.foreground.withAlpha(200)
                   : ShadTheme.of(context).colorScheme.foreground,
             ).fontFamily!,
             fontSize: 15,
