@@ -301,7 +301,15 @@ class _ContainerTableState extends State<ContainerTable> {
   late final containersResource = Resource<List<RoomContainer>>(
     () => widget.client.containers
         .list(all: all)
-        .then((containers) => containers..sort((a, b) => a.id.compareTo(b.id))),
+        .then(
+          (containers) => containers
+            ..sort(
+              (a, b) =>
+                  (a.name?.toLowerCase() ?? a.id.toLowerCase()).compareTo(
+                    b.name?.toLowerCase() ?? b.id.toLowerCase(),
+                  ),
+            ),
+        ),
   );
 
   @override
