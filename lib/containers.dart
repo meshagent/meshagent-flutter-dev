@@ -304,10 +304,9 @@ class _ContainerTableState extends State<ContainerTable> {
         .then(
           (containers) => containers
             ..sort(
-              (a, b) =>
-                  (a.name?.toLowerCase() ?? a.id.toLowerCase()).compareTo(
-                    b.name?.toLowerCase() ?? b.id.toLowerCase(),
-                  ),
+              (a, b) => (a.name?.toLowerCase() ?? a.id.toLowerCase()).compareTo(
+                b.name?.toLowerCase() ?? b.id.toLowerCase(),
+              ),
             ),
         ),
   );
