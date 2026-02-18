@@ -633,6 +633,8 @@ class ServiceTable extends StatefulWidget {
 }
 
 class _ServiceTableState extends State<ServiceTable> {
+  final Set<String> _restartInFlightServiceIds = <String>{};
+
   @override
   void initState() {
     super.initState();
@@ -737,7 +739,16 @@ class _ServiceTableState extends State<ServiceTable> {
                     final showRestartSpinner =
                         stateLabel == "restarting" || stateLabel == "scheduled";
                     final containerId = state?.containerId;
-                    final image = service.container?.image ?? "—";
+                    final containerSpec = service.container;
+                    final image = containerSpec?.image ?? "—";
+                    final canRestart =
+                        serviceId != null &&
+                        containerSpec != null &&
+                        containerSpec.onDemand != true;
+                    final isRestarting = stateLabel == "restarting";
+                    final isRestartInFlight =
+                        serviceId != null &&
+                        _restartInFlightServiceIds.contains(serviceId);
 
                     return DataRow(
                       cells: [
@@ -798,30 +809,89 @@ class _ServiceTableState extends State<ServiceTable> {
                         ),
                         DataCell(Text("${state?.restartCount ?? 0}")),
                         DataCell(
-                          IconButton(
-                            icon: const Icon(LucideIcons.logs),
-                            tooltip: "Logs",
-                            onPressed: containerId == null
-                                ? null
-                                : () {
-                                    showShadDialog(
-                                      context: context,
-                                      builder: (context) => ShadDialog(
-                                        scrollable: false,
-                                        constraints: BoxConstraints(
-                                          minWidth: 1024,
-                                          minHeight: 600,
-                                          maxHeight: 700,
-                                          maxWidth: 1024,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: isRestartInFlight
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
                                         ),
-                                        title: Text("Service logs"),
-                                        child: ContainerLogs(
-                                          client: widget.client,
-                                          containerId: containerId,
-                                        ),
-                                      ),
-                                    );
-                                  },
+                                      )
+                                    : const Icon(Icons.restart_alt),
+                                tooltip: "Restart",
+                                onPressed:
+                                    !canRestart ||
+                                        isRestarting ||
+                                        isRestartInFlight
+                                    ? null
+                                    : () async {
+                                        final id = serviceId;
+                                        setState(() {
+                                          _restartInFlightServiceIds.add(id);
+                                        });
+                                        try {
+                                          await widget.client.services.restart(
+                                            serviceId: id,
+                                          );
+                                          if (!mounted) return;
+                                          ShadToaster.of(context).show(
+                                            ShadToast(
+                                              description: Text(
+                                                "Restart requested for ${service.metadata.name}",
+                                              ),
+                                            ),
+                                          );
+                                          servicesResource.refresh();
+                                        } catch (e) {
+                                          if (!mounted) return;
+                                          ShadToaster.of(context).show(
+                                            ShadToast(
+                                              description: Text(
+                                                "Restart failed: $e",
+                                              ),
+                                            ),
+                                          );
+                                        } finally {
+                                          if (mounted) {
+                                            setState(() {
+                                              _restartInFlightServiceIds.remove(
+                                                id,
+                                              );
+                                            });
+                                          }
+                                        }
+                                      },
+                              ),
+                              IconButton(
+                                icon: const Icon(LucideIcons.logs),
+                                tooltip: "Logs",
+                                onPressed: containerId == null
+                                    ? null
+                                    : () {
+                                        showShadDialog(
+                                          context: context,
+                                          builder: (context) => ShadDialog(
+                                            scrollable: false,
+                                            constraints: BoxConstraints(
+                                              minWidth: 1024,
+                                              minHeight: 600,
+                                              maxHeight: 700,
+                                              maxWidth: 1024,
+                                            ),
+                                            title: Text("Service logs"),
+                                            child: ContainerLogs(
+                                              client: widget.client,
+                                              containerId: containerId,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                              ),
+                            ],
                           ),
                         ),
                       ],
