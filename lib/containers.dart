@@ -623,6 +623,219 @@ class _ContainerTableState extends State<ContainerTable> {
   }
 }
 
+class ServiceTable extends StatefulWidget {
+  const ServiceTable({super.key, required this.client});
+
+  final RoomClient client;
+
+  @override
+  State<ServiceTable> createState() => _ServiceTableState();
+}
+
+class _ServiceTableState extends State<ServiceTable> {
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(Duration(seconds: 1), _onTick);
+  }
+
+  late Timer _timer;
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  void _onTick(Timer timer) {
+    servicesResource.refresh();
+  }
+
+  late final servicesResource = Resource<ListServicesResult>(
+    () => widget.client.services.listWithState(),
+  );
+
+  String _formatTimestamp(DateTime? value) {
+    if (value == null) {
+      return "—";
+    }
+    String two(int part) => part.toString().padLeft(2, "0");
+    return "${value.year}-${two(value.month)}-${two(value.day)} "
+        "${two(value.hour)}:${two(value.minute)}:${two(value.second)}";
+  }
+
+  String _formatRemaining(Duration duration) {
+    final totalSeconds = duration.inSeconds;
+    if (totalSeconds <= 0) {
+      return "now";
+    }
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+    if (hours > 0) {
+      return "${hours}h ${minutes}m ${seconds}s";
+    }
+    if (minutes > 0) {
+      return "${minutes}m ${seconds}s";
+    }
+    return "${seconds}s";
+  }
+
+  String _formatRestartIn(DateTime? value) {
+    if (value == null) {
+      return "—";
+    }
+    final now = DateTime.now();
+    return _formatRemaining(value.difference(now));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SignalBuilder(
+      builder: (context, snapshot) {
+        if (!servicesResource.state.isReady) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (servicesResource.state.error != null) {
+          return Center(child: Text("Error: ${servicesResource.state.error}"));
+        }
+
+        final response = servicesResource.state.value!;
+        final services = [...response.services]
+          ..sort(
+            (a, b) => a.metadata.name.toLowerCase().compareTo(
+              b.metadata.name.toLowerCase(),
+            ),
+          );
+
+        if (services.isEmpty) {
+          return const Center(child: Text("No services configured"));
+        }
+
+        return LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            scrollDirection: Axis.vertical,
+            child: DataTable(
+              columns: const [
+                DataColumn(label: Text("State")),
+                DataColumn(label: Text("Name")),
+                DataColumn(label: Text("Image")),
+                DataColumn(label: Text("Container")),
+                DataColumn(label: Text("Started")),
+                DataColumn(label: Text("Restart In")),
+                DataColumn(label: Text("Restarts")),
+                DataColumn(label: Text("")),
+              ],
+              rows: [
+                for (final service in services)
+                  () {
+                    final serviceId = service.id;
+                    final state = serviceId == null
+                        ? null
+                        : response.serviceStates[serviceId];
+                    final stateLabel = state?.state ?? "unknown";
+                    final showRestartSpinner =
+                        stateLabel == "restarting" || stateLabel == "scheduled";
+                    final containerId = state?.containerId;
+                    final image = service.container?.image ?? "—";
+
+                    return DataRow(
+                      cells: [
+                        DataCell(
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: showRestartSpinner
+                                    ? const CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      )
+                                    : null,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(stateLabel),
+                            ],
+                          ),
+                        ),
+                        DataCell(
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: constraints.maxWidth * .2,
+                            ),
+                            child: Text(
+                              service.metadata.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: constraints.maxWidth * .3,
+                            ),
+                            child: Text(
+                              image,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        DataCell(
+                          Text(
+                            containerId == null
+                                ? "—"
+                                : containerId.length > 12
+                                ? containerId.substring(0, 12)
+                                : containerId,
+                          ),
+                        ),
+                        DataCell(Text(_formatTimestamp(state?.startedAtTime))),
+                        DataCell(
+                          Text(_formatRestartIn(state?.restartScheduledAtTime)),
+                        ),
+                        DataCell(Text("${state?.restartCount ?? 0}")),
+                        DataCell(
+                          IconButton(
+                            icon: const Icon(LucideIcons.logs),
+                            tooltip: "Logs",
+                            onPressed: containerId == null
+                                ? null
+                                : () {
+                                    showShadDialog(
+                                      context: context,
+                                      builder: (context) => ShadDialog(
+                                        scrollable: false,
+                                        constraints: BoxConstraints(
+                                          minWidth: 1024,
+                                          minHeight: 600,
+                                          maxHeight: 700,
+                                          maxWidth: 1024,
+                                        ),
+                                        title: Text("Service logs"),
+                                        child: ContainerLogs(
+                                          client: widget.client,
+                                          containerId: containerId,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                          ),
+                        ),
+                      ],
+                    );
+                  }(),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Accepts a fully‑parsed ServiceTemplateSpec and fires [onSubmit]
 /// once all variables are filled in and the user presses **Continue**.
 class ConfigureServiceTemplateDialog extends StatelessWidget {

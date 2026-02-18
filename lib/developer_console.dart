@@ -4,7 +4,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:meshagent/meshagent.dart';
-import 'package:meshagent/room_server_client.dart';
 import 'package:meshagent_flutter_widgets/widgets.dart';
 import 'package:meshagent_luau/meshagent_luau.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
@@ -72,6 +71,7 @@ enum DeveloperConsoleView {
   metrics,
   terminal,
   containers,
+  services,
   widgets,
   images,
 }
@@ -301,7 +301,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
 
               SizedBox(width: 15),
               SizedBox(
-                width: 300,
+                width: 420,
                 child: ShadTabs<DeveloperConsoleView>(
                   value: view,
                   onChanged: (value) {
@@ -317,6 +317,10 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                     ShadTab(
                       value: DeveloperConsoleView.containers,
                       child: Text("Containers"),
+                    ),
+                    ShadTab(
+                      value: DeveloperConsoleView.services,
+                      child: Text("Services"),
                     ),
                   ],
                 ),
@@ -395,6 +399,9 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
             DeveloperConsoleView.containers => ContainerTable(
               client: widget.room,
               onRun: onRun,
+            ),
+            DeveloperConsoleView.services => ServiceTable(
+              client: widget.room,
             ),
 
             DeveloperConsoleView.widgets => LuauConsoleViewer(),
