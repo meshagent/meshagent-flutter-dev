@@ -400,9 +400,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
               client: widget.room,
               onRun: onRun,
             ),
-            DeveloperConsoleView.services => ServiceTable(
-              client: widget.room,
-            ),
+            DeveloperConsoleView.services => ServiceTable(client: widget.room),
 
             DeveloperConsoleView.widgets => LuauConsoleViewer(),
           },
