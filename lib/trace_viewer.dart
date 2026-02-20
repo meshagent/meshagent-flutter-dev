@@ -472,9 +472,18 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
 }
 
 class LiveLogViewer extends StatefulWidget {
-  const LiveLogViewer({super.key, required this.events});
+  const LiveLogViewer({
+    super.key,
+    required this.events,
+    this.searchQuery = "",
+    this.levelFilter = LogLevelFilter.all,
+    this.clearSignal = 0,
+  });
 
   final Stream<RoomEvent> events;
+  final String searchQuery;
+  final LogLevelFilter levelFilter;
+  final int clearSignal;
 
   @override
   State createState() => _LiveLogViewer();
@@ -491,6 +500,84 @@ class _LiveLogViewer extends State<LiveLogViewer> {
   StreamSubscription? sub;
 
   final List<LogRecord> logs = [];
+
+  @override
+  void didUpdateWidget(covariant LiveLogViewer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.clearSignal != oldWidget.clearSignal) {
+      setState(() {
+        logs.clear();
+      });
+    }
+  }
+
+  String _renderedBody(LogRecord log) {
+    return ansiToPlainText(log.body);
+  }
+
+  bool _matchesQuery(LogRecord log) {
+    final query = widget.searchQuery.trim();
+    if (query.isEmpty) {
+      return true;
+    }
+    return _renderedBody(log).toLowerCase().contains(query.toLowerCase());
+  }
+
+  bool _matchesLevel(LogRecord log) {
+    if (widget.levelFilter == LogLevelFilter.all) {
+      return true;
+    }
+    return logLevelFilterForSeverity(log.severity) == widget.levelFilter;
+  }
+
+  InlineSpan _buildHighlightedBody({
+    required String body,
+    required TextStyle baseStyle,
+    required String query,
+    required Color highlightColor,
+    required Color highlightTextColor,
+  }) {
+    if (query.isEmpty) {
+      return TextSpan(text: body, style: baseStyle);
+    }
+
+    final queryLower = query.toLowerCase();
+    final bodyLower = body.toLowerCase();
+
+    final children = <InlineSpan>[];
+    var start = 0;
+    while (true) {
+      final index = bodyLower.indexOf(queryLower, start);
+      if (index < 0) {
+        if (start < body.length) {
+          children.add(TextSpan(text: body.substring(start), style: baseStyle));
+        }
+        break;
+      }
+
+      if (index > start) {
+        children.add(
+          TextSpan(text: body.substring(start, index), style: baseStyle),
+        );
+      }
+
+      final matchEnd = index + query.length;
+      children.add(
+        TextSpan(
+          text: body.substring(index, matchEnd),
+          style: baseStyle.copyWith(
+            backgroundColor: highlightColor,
+            color: highlightTextColor,
+            fontWeight: FontWeight.w700,
+            decoration: TextDecoration.underline,
+          ),
+        ),
+      );
+      start = matchEnd;
+    }
+
+    return TextSpan(style: baseStyle, children: children);
+  }
 
   void onEvent(RoomEvent event) {
     if (event is RoomLogEvent && event.name == "otel.log") {
@@ -530,12 +617,17 @@ class _LiveLogViewer extends State<LiveLogViewer> {
 
   @override
   Widget build(BuildContext context) {
+    final query = widget.searchQuery.trim();
+    final visibleLogs = logs
+        .where((m) => _matchesLevel(m) && _matchesQuery(m))
+        .toList();
+
     return SelectionArea(
       child: SuperListView(
         controller: scrollController,
         padding: const EdgeInsets.all(20.0),
         children: [
-          for (final m in logs) ...[
+          for (final m in visibleLogs) ...[
             SizedBox(
               width: double.infinity,
               child: Row(
@@ -622,9 +714,9 @@ class _LiveLogViewer extends State<LiveLogViewer> {
 
                   SizedBox(width: 6),
                   Expanded(
-                    child: Text.rich(
-                      TextSpan(
-                        style: GoogleFonts.sourceCodePro(
+                    child: Builder(
+                      builder: (context) {
+                        final baseStyle = GoogleFonts.sourceCodePro(
                           color: switch (m.severity) {
                             Severity.warn => Colors.orange,
                             Severity.warn2 => Colors.orange,
@@ -637,9 +729,33 @@ class _LiveLogViewer extends State<LiveLogViewer> {
                             _ => ShadTheme.of(context).colorScheme.foreground,
                           },
                           height: 1.5,
-                        ),
-                        children: [ansiToTextSpan(m.body)],
-                      ),
+                        );
+                        if (query.isEmpty) {
+                          return Text.rich(
+                            ansiToTextSpan(m.body, baseStyle: baseStyle),
+                          );
+                        }
+
+                        final body = _renderedBody(m);
+                        final isDark =
+                            Theme.of(context).brightness == Brightness.dark;
+                        final highlightColor = isDark
+                            ? const Color(0xFF8A6A00)
+                            : const Color(0xFFFFEB3B);
+                        final highlightTextColor = isDark
+                            ? Colors.white
+                            : Colors.black;
+
+                        return Text.rich(
+                          _buildHighlightedBody(
+                            body: body,
+                            baseStyle: baseStyle,
+                            query: query,
+                            highlightColor: highlightColor,
+                            highlightTextColor: highlightTextColor,
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -1060,6 +1176,50 @@ enum Severity {
   fatal2,
   fatal3,
   fatal4,
+}
+
+enum LogLevelFilter { all, trace, debug, info, warn, error, fatal }
+
+String logLevelFilterLabel(LogLevelFilter level) {
+  return switch (level) {
+    LogLevelFilter.all => "All levels",
+    LogLevelFilter.trace => "Trace",
+    LogLevelFilter.debug => "Debug",
+    LogLevelFilter.info => "Info",
+    LogLevelFilter.warn => "Warn",
+    LogLevelFilter.error => "Error",
+    LogLevelFilter.fatal => "Fatal",
+  };
+}
+
+LogLevelFilter? logLevelFilterForSeverity(Severity severity) {
+  return switch (severity) {
+    Severity.trace ||
+    Severity.trace2 ||
+    Severity.trace3 ||
+    Severity.trace4 => LogLevelFilter.trace,
+    Severity.debug ||
+    Severity.debug2 ||
+    Severity.debug3 ||
+    Severity.debug4 => LogLevelFilter.debug,
+    Severity.info ||
+    Severity.info2 ||
+    Severity.info3 ||
+    Severity.info4 => LogLevelFilter.info,
+    Severity.warn ||
+    Severity.warn2 ||
+    Severity.warn3 ||
+    Severity.warn4 => LogLevelFilter.warn,
+    Severity.error ||
+    Severity.error2 ||
+    Severity.error3 ||
+    Severity.error4 => LogLevelFilter.error,
+    Severity.fatal ||
+    Severity.fatal2 ||
+    Severity.fatal3 ||
+    Severity.fatal4 => LogLevelFilter.fatal,
+    Severity.unspecified => null,
+  };
 }
 
 Severity _sevFromJson(String? s) {

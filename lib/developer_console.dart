@@ -98,6 +98,9 @@ class RoomDeveloperConsole extends StatefulWidget {
 
 class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
   var view = DeveloperConsoleView.logs;
+  String logFilter = "";
+  LogLevelFilter logLevelFilter = LogLevelFilter.all;
+  int logClearSignal = 0;
 
   ExecSession? selectedRun;
   final List<ExecSession> runs = [];
@@ -110,6 +113,16 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
       runs.add(run);
       view = DeveloperConsoleView.terminal;
       selectedRun = run;
+    });
+  }
+
+  void _setView(DeveloperConsoleView nextView) {
+    setState(() {
+      view = nextView;
+      if (nextView != DeveloperConsoleView.logs) {
+        logFilter = "";
+        logLevelFilter = LogLevelFilter.all;
+      }
     });
   }
 
@@ -257,11 +270,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                 width: 300,
                 child: ShadTabs<DeveloperConsoleView>(
                   value: view,
-                  onChanged: (value) {
-                    setState(() {
-                      view = value;
-                    });
-                  },
+                  onChanged: _setView,
                   tabs: [
                     ShadTab(
                       value: DeveloperConsoleView.logs,
@@ -285,11 +294,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                 width: 100,
                 child: ShadTabs<DeveloperConsoleView>(
                   value: view,
-                  onChanged: (value) {
-                    setState(() {
-                      view = value;
-                    });
-                  },
+                  onChanged: _setView,
                   tabs: [
                     ShadTab(
                       value: DeveloperConsoleView.widgets,
@@ -304,11 +309,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                 width: 420,
                 child: ShadTabs<DeveloperConsoleView>(
                   value: view,
-                  onChanged: (value) {
-                    setState(() {
-                      view = value;
-                    });
-                  },
+                  onChanged: _setView,
                   tabs: [
                     ShadTab(
                       value: DeveloperConsoleView.images,
@@ -332,11 +333,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                 width: 100,
                 child: ShadTabs<DeveloperConsoleView>(
                   value: view,
-                  onChanged: (value) {
-                    setState(() {
-                      view = value;
-                    });
-                  },
+                  onChanged: _setView,
                   tabs: [
                     ShadTab(
                       value: DeveloperConsoleView.terminal,
@@ -348,6 +345,60 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
             ],
           ),
         ),
+        if (view == DeveloperConsoleView.logs)
+          Padding(
+            padding: EdgeInsets.only(bottom: 10, left: 20, right: 20),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 420,
+                  child: ShadInput(
+                    placeholder: Text("Filter..."),
+                    onChanged: (value) {
+                      setState(() {
+                        logFilter = value;
+                      });
+                    },
+                  ),
+                ),
+                SizedBox(width: 10),
+                SizedBox(
+                  width: 180,
+                  child: ShadSelect<LogLevelFilter>(
+                    initialValue: logLevelFilter,
+                    onChanged: (value) {
+                      setState(() {
+                        logLevelFilter = value ?? LogLevelFilter.all;
+                      });
+                    },
+                    selectedOptionBuilder: (context, value) =>
+                        Text(logLevelFilterLabel(value)),
+                    options: [
+                      for (final level in LogLevelFilter.values)
+                        ShadOption<LogLevelFilter>(
+                          value: level,
+                          child: Text(logLevelFilterLabel(level)),
+                        ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 10),
+                ShadButton.ghost(
+                  leading: Icon(LucideIcons.trash, size: 16),
+                  onPressed: () {
+                    setState(() {
+                      widget.events.removeWhere(
+                        (event) =>
+                            event is RoomLogEvent && event.name == "otel.log",
+                      );
+                      logClearSignal++;
+                    });
+                  },
+                  child: Text("Clear Logs"),
+                ),
+              ],
+            ),
+          ),
 
         Expanded(
           child: switch (view) {
@@ -360,6 +411,9 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
               events: Stream.fromIterable(
                 widget.events,
               ).followedBy(widget.room.events),
+              searchQuery: logFilter,
+              levelFilter: logLevelFilter,
+              clearSignal: logClearSignal,
             ),
             DeveloperConsoleView.metrics => LiveMetricsViewer(
               pricing: widget.pricing,

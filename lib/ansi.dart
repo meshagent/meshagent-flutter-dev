@@ -44,6 +44,18 @@ TextSpan ansiToTextSpan(String source, {TextStyle? baseStyle}) {
   return TextSpan(style: baseStyle, children: spans);
 }
 
+/// Converts ANSI/ASCII escaped terminal output into plain display text.
+///
+/// This applies the same control-sequence normalization used by [ansiToTextSpan]
+/// but strips all formatting sequences so callers can search/display only the
+/// rendered text content.
+String ansiToPlainText(String source) {
+  source = _normalizeControlChars(source);
+  source = _stripNonSgrCsi(source);
+  final sgr = RegExp(r'(\x1B|\u001B)\[([0-9;]*)m');
+  return source.replaceAll(sgr, '');
+}
+
 String _killSpinnerFrames(String s) {
   // Matches one printable char (no ESC, no CR/LF) between the two CSI pairs
   final spinner = RegExp(r'\x1B\[1G\x1B\[0K[^\x1B\r\n]\x1B\[1G\x1B\[0K');
