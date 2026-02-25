@@ -2,12 +2,8 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:meshagent/meshagent.dart';
-import 'package:meshagent_flutter_widgets/widgets.dart';
-import 'package:meshagent_luau/meshagent_luau.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
-import 'package:super_sliver_list/super_sliver_list.dart';
 import './terminal.dart';
 import "./trace_viewer.dart";
 import 'package:stream_transform/stream_transform.dart';
@@ -72,7 +68,6 @@ enum DeveloperConsoleView {
   terminal,
   containers,
   services,
-  widgets,
   images,
 }
 
@@ -291,21 +286,6 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
               SizedBox(width: 15),
 
               SizedBox(
-                width: 100,
-                child: ShadTabs<DeveloperConsoleView>(
-                  value: view,
-                  onChanged: _setView,
-                  tabs: [
-                    ShadTab(
-                      value: DeveloperConsoleView.widgets,
-                      child: Text("Widgets"),
-                    ),
-                  ],
-                ),
-              ),
-
-              SizedBox(width: 15),
-              SizedBox(
                 width: 420,
                 child: ShadTabs<DeveloperConsoleView>(
                   value: view,
@@ -455,8 +435,6 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
               onRun: onRun,
             ),
             DeveloperConsoleView.services => ServiceTable(client: widget.room),
-
-            DeveloperConsoleView.widgets => LuauConsoleViewer(),
           },
         ),
       ],
@@ -613,41 +591,6 @@ class _LiveLogsViewerState extends State<LiveLogsViewer> {
                     ),
                   ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class LuauConsoleViewer extends StatefulWidget {
-  LuauConsoleViewer({super.key});
-
-  @override
-  State createState() => _LuauConsoleViewer();
-}
-
-class _LuauConsoleViewer extends State<LuauConsoleViewer> {
-  final scrollController = ScrollController();
-  @override
-  Widget build(BuildContext context) {
-    final console = LuauConsole.of(context);
-
-    if (console.consoleEntries.length == 0) {
-      return SizedBox();
-    }
-
-    return SelectionArea(
-      child: SuperListView(
-        controller: scrollController,
-        padding: const EdgeInsets.all(20.0),
-        children: [
-          for (final entry in console.consoleEntries)
-            Text(
-              "${entry.scriptName}:${entry.lineNumber}: ${entry.spans.join("\n")}",
-              style: entry.type == ConsoleEntryType.error
-                  ? GoogleFonts.sourceCodePro(color: Colors.red)
-                  : GoogleFonts.sourceCodePro(),
-            ),
         ],
       ),
     );
