@@ -906,16 +906,26 @@ class _ServiceTableState extends State<ServiceTable> {
   }
 }
 
-/// Accepts a fully‑parsed ServiceTemplateSpec and fires [onSubmit]
-/// once all variables are filled in and the user presses **Continue**.
 class ConfigureServiceTemplateDialog extends StatelessWidget {
   const ConfigureServiceTemplateDialog({
     super.key,
     required this.spec,
     required this.actionsBuilder,
+    this.prefilledVars,
+    this.routeDomains = const [],
+    this.header = const [],
+    this.customActions = const [],
+    this.dialogTitle,
+    this.dialogDescription,
   });
 
   final ServiceTemplateSpec spec;
+  final Map<String, String>? prefilledVars;
+  final List<String> routeDomains;
+  final List<Widget> header;
+  final List<Widget> customActions;
+  final String? dialogTitle;
+  final String? dialogDescription;
 
   final List<Widget> Function(
     BuildContext,
@@ -927,15 +937,245 @@ class ConfigureServiceTemplateDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ShadDialog(
-      padding: const EdgeInsets.all(20),
-      title: Text("Configure Service"),
+      useSafeArea: false,
+      expandActionsWhenTiny: false,
+      actionsAxis: Axis.horizontal,
+      constraints: BoxConstraints(maxWidth: 600, minWidth: 600),
+      scrollable: false,
+      title: Text(dialogTitle ?? "Install agent"),
       description: Text(
-        "This container contains a MeshAgent service. Running this service will grant it access to your room. Review the service details before continuing.",
+        dialogDescription ??
+            "Installing this agent will grant it access to your room. Review the details before continuing.",
       ),
-      constraints: BoxConstraints(minWidth: 600, maxWidth: 600),
-      child: ConfigureServiceTemplate(
-        spec: spec,
-        actionsBuilder: actionsBuilder,
+      child: SizedBox(
+        height: 500,
+        child: ConfigureServiceTemplate(
+          spec: spec,
+          prefilledVars: prefilledVars,
+          routeDomains: routeDomains,
+          customActions: customActions,
+          header: [
+            const SizedBox(height: 8),
+            ServiceNameCard(manifest: spec),
+            const SizedBox(height: 8),
+            ServiceInfoCard(manifest: spec),
+            ...header,
+          ],
+          actionsBuilder: actionsBuilder,
+        ),
+      ),
+    );
+  }
+}
+
+class ServiceNameCard extends StatelessWidget {
+  const ServiceNameCard({super.key, required this.manifest});
+  final ServiceTemplateSpec manifest;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(
+          color: ShadTheme.of(context).colorScheme.border,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  manifest.metadata.name,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (manifest.metadata.description != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    manifest.metadata.description!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: ShadTheme.of(context).colorScheme.foreground,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              LucideIcons.bot,
+              color: ShadTheme.of(context).colorScheme.background,
+              size: 22,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+final permissionHelp = {
+  "agents": "Use tools in the room or talk to other agents",
+  "containers": "Run custom code in sandboxed containers",
+  "database": "Interact with database tables",
+  "developer": "Watch logs in the room",
+  "livekit": "Join meetings",
+  "messaging": "Communicate with users and agents",
+  "sync": "Interact with threads and synchronized documents",
+  "storage": "Interact with files in the room",
+  "queues": "Interact with job queues",
+};
+
+class _ServiceInstallSummary {
+  const _ServiceInstallSummary({
+    required this.permissionKeys,
+    required this.installsMcp,
+    required this.tokenIdentities,
+  });
+
+  final List<String> permissionKeys;
+  final bool installsMcp;
+  final List<String> tokenIdentities;
+}
+
+class ServiceInfoCard extends StatelessWidget {
+  const ServiceInfoCard({super.key, required this.manifest});
+  final ServiceTemplateSpec manifest;
+
+  _ServiceInstallSummary _summarize(List<PortSpec> ports) {
+    final keys = <String>{};
+    final tokenIdentities = <String>{};
+    var installsMcp = false;
+
+    for (final p in ports) {
+      for (final e in p.endpoints) {
+        if (e.meshagent != null) {
+          final scope = e.meshagent!.api ?? ApiScope.agentDefault();
+          final asJson = scope.toJson();
+          keys.addAll(asJson.keys);
+        }
+        if (e.mcp != null) {
+          installsMcp = true;
+        }
+      }
+    }
+
+    for (final env
+        in manifest.container?.environment ?? <TemplateEnvironmentVariable>[]) {
+      final token = env.token;
+      if (token == null) {
+        continue;
+      }
+
+      tokenIdentities.add(token.identity);
+      final tokenApi = token.api;
+      if (tokenApi != null) {
+        keys.addAll(tokenApi.toJson().keys);
+      }
+    }
+
+    return _ServiceInstallSummary(
+      permissionKeys: keys.toList(),
+      installsMcp: installsMcp,
+      tokenIdentities: tokenIdentities.toList(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final labelStyle = Theme.of(
+      context,
+    ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600);
+    final summary = _summarize(manifest.ports);
+    final showsInstallSummary =
+        manifest.agents.isNotEmpty || summary.installsMcp;
+    final filteredAgentName = manifest
+        .metadata
+        .annotations["meshagent.service.filter.agent"]
+        ?.trim();
+    final hasFilteredAgentName =
+        filteredAgentName != null && filteredAgentName.isNotEmpty;
+    final permissionLines = <String>[
+      ...summary.permissionKeys.map((t) => permissionHelp[t] ?? t),
+      ...summary.tokenIdentities.map(
+        (identity) => "Create environment token for identity '$identity'",
+      ),
+    ];
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showsInstallSummary) ...[
+            Text('This package will install:', style: labelStyle),
+            Padding(
+              padding: EdgeInsets.only(left: 8, top: 8, bottom: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final a in manifest.agents) ...[
+                    if (a.annotations["meshagent.agent.type"] == "ChatBot")
+                      Text("• A chatbot"),
+                    if (a.annotations["meshagent.agent.type"] == "Mailbot")
+                      Text("• A mailbot"),
+                    if (a.annotations["meshagent.agent.type"] == "VoiceBot")
+                      Text("• A voicebot"),
+                    if (a.annotations["meshagent.agent.type"] == "Shell")
+                      Text("• A terminal based agent"),
+                    if (a.annotations["meshagent.agent.widget"] != null)
+                      Text("• A custom interface"),
+                    if (a.annotations["meshagent.agent.database.schema"] !=
+                        null)
+                      Text("• A custom database"),
+                    if (a.annotations["meshagent.agent.schedule"] != null)
+                      Text("• Scheduled tasks"),
+                  ],
+                  if (summary.installsMcp) Text("• An MCP connector"),
+                  if (summary.installsMcp && hasFilteredAgentName)
+                    Text(
+                      "• This MCP connector will only be installed for agent '$filteredAgentName'",
+                    ),
+                ],
+              ),
+            ),
+          ],
+          if (permissionLines.isNotEmpty) ...[
+            Text(
+              'Installing this agent will grant it permission to:',
+              style: labelStyle,
+            ),
+            Padding(
+              padding: EdgeInsets.only(left: 8, top: 8),
+              child: Text(
+                permissionLines.map((line) => "• $line").join("\n"),
+                style: TextStyle(height: 1.75),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -946,9 +1186,17 @@ class ConfigureServiceTemplate extends StatefulWidget {
     super.key,
     required this.spec,
     required this.actionsBuilder,
+    this.prefilledVars,
+    this.routeDomains = const [],
+    this.customActions = const [],
+    this.header = const [],
   });
 
   final ServiceTemplateSpec spec;
+  final Map<String, String>? prefilledVars;
+  final List<String> routeDomains;
+  final List<Widget> customActions;
+  final List<Widget> header;
 
   final List<Widget> Function(
     BuildContext,
@@ -958,183 +1206,320 @@ class ConfigureServiceTemplate extends StatefulWidget {
   actionsBuilder;
 
   @override
-  State createState() => _ConfigureServiceTemplate();
+  State createState() => _ConfigureServiceTemplateState();
 }
 
-class _ConfigureServiceTemplate extends State<ConfigureServiceTemplate> {
-  final _formKey = GlobalKey<FormState>();
-  late final Map<String, String> _vars; // {varName: value}
+class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
+  final _formKey = GlobalKey<ShadFormState>();
+  late Map<String, String> _vars;
+  late Map<String, String> _routeSubdomains;
+  late Map<String, String> _routeSuffixes;
 
   @override
   void initState() {
     super.initState();
-    // Initialise every variable with an empty string
-    _vars = {
-      for (final v in widget.spec.variables ?? <ServiceTemplateVariable>[])
-        v.name: '',
-    };
+    final initial = <String, String>{};
+    for (final v in widget.spec.variables ?? []) {
+      initial[v.name] = '';
+    }
+    if (widget.prefilledVars != null) {
+      initial.addAll(widget.prefilledVars!);
+    }
+    _vars = initial;
+    _routeSubdomains = {};
+    _routeSuffixes = {};
+    _initRouteParts();
   }
 
-  /// Replace `${VAR}` or `{{VAR}}` tokens in [spec.command] with current values.
-  String _renderCommand() {
-    var cmd = widget.spec.container?.command ?? '';
-    _vars.forEach((key, value) {
-      cmd = cmd.replaceAll('\${$key}', value).replaceAll('{{${key}}}', value);
-    });
-    return cmd.trim();
+  List<String> get _routeDomains => widget.routeDomains;
+
+  void _initRouteParts() {
+    final suffixes = _routeDomains;
+    if (suffixes.isEmpty) return;
+    for (final variable
+        in widget.spec.variables ?? <ServiceTemplateVariable>[]) {
+      if (variable.type != "route") continue;
+      final rawValue = _vars[variable.name]?.trim() ?? "";
+      final matchedSuffix =
+          _matchRouteSuffix(rawValue, suffixes) ??
+          (suffixes.isNotEmpty ? suffixes.first : "");
+      _routeSuffixes[variable.name] = matchedSuffix;
+      _routeSubdomains[variable.name] = _routeSubdomain(
+        rawValue,
+        matchedSuffix,
+      );
+      _syncRouteValue(variable.name);
+    }
+  }
+
+  String? _matchRouteSuffix(String value, List<String> suffixes) {
+    if (value.isEmpty) return null;
+    final sorted = List<String>.from(suffixes)
+      ..sort((a, b) => b.length.compareTo(a.length));
+    for (final suffix in sorted) {
+      if (value == suffix) return suffix;
+      if (value.endsWith(".$suffix")) return suffix;
+    }
+    return null;
+  }
+
+  String _routeSubdomain(String value, String suffix) {
+    if (value.isEmpty || suffix.isEmpty) return value;
+    final suffixWithDot = ".$suffix";
+    if (!value.endsWith(suffixWithDot)) return value;
+    return value.substring(0, value.length - suffixWithDot.length);
+  }
+
+  void _syncRouteValue(String name) {
+    final subdomain = _routeSubdomains[name]?.trim() ?? "";
+    final suffix = _routeSuffixes[name]?.trim() ?? "";
+    if (subdomain.isEmpty || suffix.isEmpty) {
+      _vars[name] = "";
+      return;
+    }
+    _vars[name] = "$subdomain.$suffix";
+  }
+
+  String _variableTitle(ServiceTemplateVariable variable) {
+    final title = variable.title?.trim();
+    if (title == null || title.isEmpty) {
+      return variable.name;
+    }
+    return title;
+  }
+
+  bool _validate() {
+    return _formKey.currentState?.validate(
+          autoScrollWhenFocusOnInvalid: true,
+        ) ??
+        false;
   }
 
   @override
   Widget build(BuildContext context) {
-    final hasVars = widget.spec.variables?.isNotEmpty ?? false;
+    final labelStyle = Theme.of(
+      context,
+    ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600);
+    final mailDomain = const String.fromEnvironment("MESHAGENT_MAIL_DOMAIN");
+    final emailSuffix = mailDomain.isEmpty ? "" : "@$mailDomain";
+    final routeDomains = _routeDomains;
 
-    return Form(
+    return ShadForm(
       key: _formKey,
-      child: ListView(
-        shrinkWrap: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 16,
         children: [
-          const SizedBox(height: 16),
-          Text(
-            widget.spec.metadata.name,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 4),
-          if (widget.spec.metadata.description != null)
-            Text(widget.spec.metadata.description!),
-          const SizedBox(height: 16),
-          // ── Variable inputs ─────────────────────────────────────────────
-          if (hasVars)
-            Text(
-              "Required variables",
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          const SizedBox(height: 4),
-          if (widget.spec.variables != null)
-            ...widget.spec.variables!.map(
-              (v) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: v.enumValues == null
-                    ? ShadInputFormField(
-                        label: Text(v.name),
-                        obscureText: v.obscure,
-                        description: v.description == null
-                            ? null
-                            : Text(v.description ?? ''),
-
-                        validator: v.optional
-                            ? null
-                            : (txt) => (txt.trim().isEmpty)
-                                  ? '${v.name} is required'
-                                  : null,
-                        onChanged: (txt) => setState(() => _vars[v.name] = txt),
-                      )
-                    : ShadSelectFormField<String>(
-                        label: Text(v.name),
-                        initialValue: v.enumValues![0],
-                        selectedOptionBuilder: (context, value) => Text(value),
-                        options: [
-                          ...v.enumValues!.map(
-                            (v) => ShadOption<String>(value: v, child: Text(v)),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                ...widget.header,
+                if (widget.spec.variables?.isNotEmpty ?? false) ...[
+                  for (final v
+                      in widget.spec.variables ?? <ServiceTemplateVariable>[])
+                    switch (v.type) {
+                      "email" => Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ShadInputFormField(
+                            id: v.name,
+                            constraints: BoxConstraints(maxWidth: 400),
+                            padding: EdgeInsets.only(
+                              left: 8,
+                              top: 0,
+                              bottom: 0,
+                              right: 0,
+                            ),
+                            label: Text(
+                              '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
+                              style: labelStyle,
+                            ),
+                            obscureText: v.obscure,
+                            initialValue: emailSuffix.isEmpty
+                                ? (_vars[v.name] ?? '')
+                                : (_vars[v.name] ?? '').replaceAll(
+                                    emailSuffix,
+                                    '',
+                                  ),
+                            onChanged: (txt) => setState(() {
+                              final normalized = txt.trim();
+                              if (normalized.isEmpty) {
+                                _vars[v.name] = "";
+                              } else if (emailSuffix.isEmpty) {
+                                _vars[v.name] = normalized;
+                              } else {
+                                _vars[v.name] = "$normalized$emailSuffix";
+                              }
+                            }),
+                            trailing: emailSuffix.isEmpty
+                                ? null
+                                : Container(
+                                    color: ShadTheme.of(
+                                      context,
+                                    ).colorScheme.muted,
+                                    padding: EdgeInsets.all(8),
+                                    child: Text(emailSuffix),
+                                  ),
                           ),
+                          if (v.description != null)
+                            Padding(
+                              padding: EdgeInsets.symmetric(vertical: 7),
+                              child: Text(v.description ?? ''),
+                            ),
                         ],
-                        description: v.description == null
-                            ? null
-                            : Text(v.description ?? ''),
-                        validator: v.optional
-                            ? null
-                            : (txt) =>
-                                  (txt?.trim().isEmpty == true || txt == null)
-                                  ? '${v.name} is required'
-                                  : null,
-                        onChanged: (txt) =>
-                            setState(() => _vars[v.name] = txt!),
                       ),
-              ),
-            ),
-
-          // ── Command preview ─────────────────────────────────────────────
-          if (widget.spec.container?.command != null) ...[
-            const SizedBox(height: 16),
-            Text('Base Image', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            SelectableText(widget.spec.container?.image ?? ""),
-            const SizedBox(height: 16),
-            Text(
-              'Command to execute',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 4),
-            SelectableText(
-              _renderCommand().isEmpty
-                  ? '— complete the variables above —'
-                  : _renderCommand(),
-            ),
-          ],
-
-          const SizedBox(height: 16),
-          Text('Room storage', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 4),
-
-          if (widget.spec.container?.storage == null ||
-              widget.spec.container?.storage?.room == null)
-            Text("No storage mount"),
-
-          if (widget.spec.container?.storage != null &&
-              widget.spec.container?.storage?.room != null) ...[
-            for (final rs in widget.spec.container?.storage?.room ?? []) ...[
-              if (rs.subpath != null) ...[
-                Text(
-                  rs.subpath == null
-                      ? "Mounts entire room's storage to"
-                      : "Mounts only ${rs.subpath} to",
-                ),
-                Text(rs.path),
-              ],
-            ],
-          ],
-
-          // ── Ports & endpoints summary ──────────────────────────────────
-          if (widget.spec.ports.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            Text('Endpoints', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            ...widget.spec.ports.map(
-              (p) => ShadCard(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Port ${p.num.value ?? "auto assigned"} ${p.type ?? ""}',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    ...p.endpoints.map(
-                      (e) => Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          (e.meshagent != null)
-                              ? '• ${e.path}  →  ${e.meshagent?.identity}'
-                              : (e.mcp != null ? "${e.path} → mcp" : e.path),
-                        ),
+                      "route" => Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (routeDomains.isEmpty)
+                            ShadInputFormField(
+                              id: "${v.name}_domain",
+                              label: Text(
+                                '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
+                                style: labelStyle,
+                              ),
+                              initialValue: _vars[v.name] ?? "",
+                              description: v.description == null
+                                  ? null
+                                  : Text(v.description ?? ''),
+                              validator: v.optional
+                                  ? null
+                                  : (txt) => (txt.trim().isEmpty)
+                                        ? '${_variableTitle(v)} is required'
+                                        : null,
+                              onChanged: (txt) =>
+                                  setState(() => _vars[v.name] = txt.trim()),
+                            )
+                          else ...[
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                ShadInputFormField(
+                                  constraints: BoxConstraints(maxWidth: 300),
+                                  padding: EdgeInsets.only(left: 8),
+                                  gap: 0,
+                                  id: "${v.name}_subdomain",
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  label: Text(
+                                    '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
+                                    style: labelStyle,
+                                  ),
+                                  initialValue: _routeSubdomains[v.name] ?? "",
+                                  validator: v.optional
+                                      ? null
+                                      : (txt) => (txt.trim().isEmpty)
+                                            ? '${_variableTitle(v)} is required'
+                                            : null,
+                                  onChanged: (txt) {
+                                    setState(() {
+                                      _routeSubdomains[v.name] = txt.trim();
+                                      _syncRouteValue(v.name);
+                                    });
+                                  },
+                                  trailing: Container(
+                                    color: ShadTheme.of(
+                                      context,
+                                    ).colorScheme.muted,
+                                    padding: EdgeInsets.all(8),
+                                    child: Text(".${routeDomains.first}"),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (v.description != null)
+                              Padding(
+                                padding: EdgeInsets.symmetric(vertical: 7),
+                                child: Text(v.description ?? ''),
+                              ),
+                          ],
+                        ],
                       ),
-                    ),
+                      _ =>
+                        v.enumValues == null
+                            ? ShadInputFormField(
+                                id: v.name,
+                                label: Text(
+                                  '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
+                                  style: labelStyle,
+                                ),
+                                obscureText: v.obscure,
+                                initialValue: _vars[v.name] ?? '',
+                                description: v.description == null
+                                    ? null
+                                    : Text(v.description ?? ''),
+                                validator: (txt) {
+                                  final val = txt.trim();
+                                  if (v.optional) return null;
+                                  final msg = val.isEmpty
+                                      ? '${_variableTitle(v)} is required'
+                                      : null;
+                                  return msg;
+                                },
+                                onChanged: (txt) =>
+                                    setState(() => _vars[v.name] = txt.trim()),
+                              )
+                            : ShadSelectFormField<String>(
+                                label: Text(
+                                  _variableTitle(v),
+                                  style: labelStyle,
+                                ),
+                                id: v.name,
+                                initialValue:
+                                    _vars[v.name] ?? v.enumValues!.first,
+                                selectedOptionBuilder: (context, value) =>
+                                    Text(value),
+                                options: [
+                                  ...v.enumValues!.map(
+                                    (val) => ShadOption<String>(
+                                      value: val,
+                                      child: Text(val),
+                                    ),
+                                  ),
+                                ],
+                                description: v.description == null
+                                    ? null
+                                    : Text(v.description ?? ''),
+                                validator: v.optional
+                                    ? null
+                                    : (txt) {
+                                        final msg =
+                                            (txt?.trim().isEmpty == true ||
+                                                txt == null)
+                                            ? '${_variableTitle(v)} is required'
+                                            : null;
+                                        return msg;
+                                      },
+                                onChanged: (txt) =>
+                                    setState(() => _vars[v.name] = txt!),
+                              ),
+                    },
+                ],
+                if (widget.spec.container != null) ...[
+                  if (widget.spec.container!.storage != null &&
+                      widget.spec.container!.storage?.room != null) ...[
+                    for (final rs in widget.spec.container!.storage!.room!) ...[
+                      Text(
+                        rs.subpath == null
+                            ? "Mounts entire room's storage to"
+                            : "Mounts only ${rs.subpath} to",
+                        style: labelStyle,
+                      ),
+                      Text(rs.path),
+                    ],
                   ],
-                ),
-              ),
+                ],
+              ].map((x) => Container(margin: EdgeInsets.only(bottom: 10), child: x)).toList(),
             ),
-          ],
-
-          // ── Continue button ─────────────────────────────────────────────
-          const SizedBox(height: 24),
+          ),
           Row(
-            mainAxisAlignment: MainAxisAlignment.end,
             spacing: 8,
             children: [
-              ...widget.actionsBuilder(
-                context,
-                _vars,
-                () => _formKey.currentState?.validate() ?? false,
-              ),
+              ...widget.customActions,
+              Spacer(),
+              ...widget.actionsBuilder(context, _vars, _validate),
             ],
           ),
         ],
