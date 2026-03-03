@@ -1043,6 +1043,7 @@ final permissionHelp = {
   "messaging": "Communicate with users and agents",
   "sync": "Interact with threads and synchronized documents",
   "storage": "Interact with files in the room",
+  "secrets": "Interact with secrets in the room",
   "queues": "Interact with job queues",
 };
 
@@ -1117,9 +1118,7 @@ class ServiceInfoCard extends StatelessWidget {
         filteredAgentName != null && filteredAgentName.isNotEmpty;
     final permissionLines = <String>[
       ...summary.permissionKeys.map((t) => permissionHelp[t] ?? t),
-      ...summary.tokenIdentities.map(
-        (identity) => "Create environment token for identity '$identity'",
-      ),
+      ...summary.tokenIdentities.map((identity) => "Create environment token"),
     ];
 
     return Padding(
