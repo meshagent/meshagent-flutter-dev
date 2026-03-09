@@ -9,6 +9,47 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:xterm/xterm.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+class _ResizeForwarder {
+  _ResizeForwarder({required void Function(int width, int height) onSend})
+    : _onSend = onSend;
+
+  final void Function(int width, int height) _onSend;
+  Timer? _timer;
+  int? _pendingWidth;
+  int? _pendingHeight;
+  int? _sentWidth;
+  int? _sentHeight;
+
+  void queue(int width, int height) {
+    if (_pendingWidth == width && _pendingHeight == height) {
+      return;
+    }
+    _pendingWidth = width;
+    _pendingHeight = height;
+    _timer ??= Timer(const Duration(milliseconds: 16), _flush);
+  }
+
+  void _flush() {
+    _timer = null;
+    final width = _pendingWidth;
+    final height = _pendingHeight;
+    if (width == null || height == null) {
+      return;
+    }
+    if (_sentWidth == width && _sentHeight == height) {
+      return;
+    }
+    _sentWidth = width;
+    _sentHeight = height;
+    _onSend(width, height);
+  }
+
+  void dispose() {
+    _timer?.cancel();
+    _timer = null;
+  }
+}
+
 class RoomTerminal extends StatefulWidget {
   const RoomTerminal({super.key, required this.client});
 
@@ -19,9 +60,19 @@ class RoomTerminal extends StatefulWidget {
 }
 
 class _RoomTerminal extends State<RoomTerminal> {
+  late final _ResizeForwarder _resizeForwarder;
+
   @override
   void initState() {
     super.initState();
+    _resizeForwarder = _ResizeForwarder(
+      onSend: (width, height) {
+        final data = utf8.encode(
+          jsonEncode({"Height": height, "Width": width}),
+        );
+        websocket.sink.add(Uint8List.fromList([4, ...data]));
+      },
+    );
     terminal = Terminal(
       onOutput: (data) {
         websocket.sink.add(Uint8List.fromList([0, ...utf8.encode(data)]));
@@ -59,6 +110,7 @@ class _RoomTerminal extends State<RoomTerminal> {
   @override
   void dispose() {
     super.dispose();
+    _resizeForwarder.dispose();
     sub.cancel();
     websocket.sink.close();
   }
@@ -85,8 +137,7 @@ class _RoomTerminal extends State<RoomTerminal> {
   late final Terminal terminal;
 
   void onResize(int width, int height, _, __) {
-    final data = utf8.encode(jsonEncode({"Height": height, "Width": width}));
-    websocket.sink.add(Uint8List.fromList([4, ...data]));
+    _resizeForwarder.queue(width, height);
   }
 
   int width = 0;
@@ -136,9 +187,22 @@ class ContainerTerminal extends StatefulWidget {
 }
 
 class _ContainerTerminal extends State<ContainerTerminal> {
+  late final _ResizeForwarder _resizeForwarder;
+
   @override
   void initState() {
     super.initState();
+    _resizeForwarder = _ResizeForwarder(
+      onSend: (width, height) {
+        if (!widget.session.closed) {
+          unawaited(
+            widget.session
+                .resize(width: width, height: height)
+                .catchError((Object _) {}),
+          );
+        }
+      },
+    );
     terminal = Terminal(
       onOutput: (data) {
         widget.session.write(utf8.encode(data));
@@ -176,6 +240,7 @@ class _ContainerTerminal extends State<ContainerTerminal> {
   @override
   void dispose() {
     super.dispose();
+    _resizeForwarder.dispose();
     subStdout.cancel();
   }
 
@@ -202,9 +267,7 @@ class _ContainerTerminal extends State<ContainerTerminal> {
   late final Terminal terminal;
 
   void onResize(int width, int height, _, __) {
-    if (!widget.session.closed) {
-      widget.session.resize(width: width, height: height).catchError((err) {});
-    }
+    _resizeForwarder.queue(width, height);
   }
 
   int width = 0;
