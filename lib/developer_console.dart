@@ -27,16 +27,28 @@ class RoomDeveloperLogsListener extends StatefulWidget {
 }
 
 class _RoomDeveloperLogsListenerState extends State<RoomDeveloperLogsListener> {
+  void _handleLogError(Object error, StackTrace stackTrace) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: "meshagent_flutter_dev",
+        context: ErrorDescription("while listening to developer logs"),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
 
-    widget.client.developer.enable();
-
-    sub = widget.client.listen(onRoomEvent);
+    sub = widget.client.developer.logs().listen(
+      onRoomEvent,
+      onError: _handleLogError,
+    );
   }
 
-  late StreamSubscription sub;
+  late StreamSubscription<RoomLogEvent> sub;
 
   late final events = widget.events;
 
@@ -51,8 +63,6 @@ class _RoomDeveloperLogsListenerState extends State<RoomDeveloperLogsListener> {
     super.dispose();
 
     sub.cancel();
-
-    widget.client.developer.disable();
   }
 
   @override
@@ -99,6 +109,51 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
 
   ExecSession? selectedRun;
   final List<ExecSession> runs = [];
+  StreamSubscription<RoomLogEvent>? developerLogsSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscribeToDeveloperLogs();
+  }
+
+  @override
+  void didUpdateWidget(covariant RoomDeveloperConsole oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.room != widget.room) {
+      developerLogsSubscription?.cancel();
+      developerLogsSubscription = null;
+      _subscribeToDeveloperLogs();
+    }
+  }
+
+  void _handleDeveloperLogError(Object error, StackTrace stackTrace) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: "meshagent_flutter_dev",
+        context: ErrorDescription("while listening to developer logs"),
+      ),
+    );
+  }
+
+  void _subscribeToDeveloperLogs() {
+    developerLogsSubscription = widget.room.developer.logs().listen((event) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        widget.events.add(event);
+      });
+    }, onError: _handleDeveloperLogError);
+  }
+
+  @override
+  void dispose() {
+    developerLogsSubscription?.cancel();
+    super.dispose();
+  }
 
   void onRun(ExecSession run) {
     if (!mounted) {
