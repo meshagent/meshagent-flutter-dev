@@ -169,6 +169,7 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
   }
 
   Widget visualize(Span node) {
+    final borderColor = ShadTheme.of(context).colorScheme.border;
     if (SpanTreeNodeViewer.visualizers[node.name] != null) {
       return SpanTreeNodeViewer.visualizers[node.name]!(context, node);
     }
@@ -177,7 +178,7 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
       margin: EdgeInsets.all(8),
       padding: EdgeInsets.all(8),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey),
+        border: Border.all(color: borderColor),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Wrap(
@@ -215,6 +216,7 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = ShadTheme.of(context).colorScheme;
     final node = widget.node;
     final duration =
         ((node.endTimeUnixNano - node.startTimeUnixNano) / 1000000000).asFixed(
@@ -240,20 +242,15 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
               crossAxisAlignment: CrossAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                ShadButton.link(
-                  hoverForegroundColor: node.status?.code == "STATUS_CODE_ERROR"
-                      ? Colors.red
-                      : null,
-                  foregroundColor: node.status?.code == "STATUS_CODE_ERROR"
-                      ? Colors.red
-                      : null,
-                  onTapDown: (_) {
+                ShadGestureDetector(
+                  cursor: SystemMouseCursors.click,
+                  onTap: () {
                     setState(() {
                       expanded = !expanded;
                     });
                   },
                   child: Padding(
-                    padding: EdgeInsets.only(right: 10),
+                    padding: const EdgeInsets.only(right: 10),
                     child:
                         (widget.spans
                             .getChildren(widget.node.spanId)
@@ -262,8 +259,16 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
                             expanded
                                 ? LucideIcons.chevronDown
                                 : LucideIcons.chevronRight,
+                            color: node.status?.code == "STATUS_CODE_ERROR"
+                                ? Colors.red
+                                : colorScheme.foreground,
                           )
-                        : Icon(LucideIcons.dot),
+                        : Icon(
+                            LucideIcons.dot,
+                            color: node.status?.code == "STATUS_CODE_ERROR"
+                                ? Colors.red
+                                : colorScheme.foreground,
+                          ),
                   ),
                 ),
                 Padding(
@@ -375,6 +380,10 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
                       maxLines: 1,
                       textAlign: TextAlign.start,
                       overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colorScheme.foreground,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),
@@ -408,9 +417,12 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
                                       children: [
                                         Text(
                                           node.name,
-                                          style: ShadTheme.of(
-                                            context,
-                                          ).textTheme.muted,
+                                          style: ShadTheme.of(context)
+                                              .textTheme
+                                              .muted
+                                              .copyWith(
+                                                color: colorScheme.foreground,
+                                              ),
                                         ),
                                         Text(
                                           "Started: ${DateFormat.yMMMMEEEEd().add_jm().format(DateTime.fromMicrosecondsSinceEpoch((node.startTimeUnixNano / 1000).toInt(), isUtc: true).toLocal())}",
