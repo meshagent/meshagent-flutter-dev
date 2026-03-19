@@ -1,17 +1,17 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:convert';
 
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
-
 import 'package:google_fonts/google_fonts.dart';
-import 'dart:convert';
+import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:super_sliver_list/super_sliver_list.dart';
 
 import 'package:meshagent/room_server_client.dart';
 import 'package:meshagent_flutter_shadcn/meshagent_flutter_shadcn.dart';
-import './ansi.dart';
-import 'package:shadcn_ui/shadcn_ui.dart';
-import 'package:super_sliver_list/super_sliver_list.dart';
+
+import 'ansi.dart';
 
 dynamic trimStrings(dynamic v) {
   if (v is String) {
@@ -643,7 +643,7 @@ class _LiveLogViewer extends State<LiveLogViewer> {
             SizedBox(
               width: double.infinity,
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: .start,
                 children: [
                   ShadGestureDetector(
                     cursor: SystemMouseCursors.click,
@@ -899,15 +899,15 @@ class LiveTraceViewer extends StatefulWidget {
 }
 
 class _LiveTraceViewerState extends State<LiveTraceViewer> {
+  StreamSubscription? sub;
+  final spans = SpanCollection();
+
   @override
   void initState() {
     super.initState();
 
     sub = widget.events.listen(onEvent);
   }
-
-  StreamSubscription? sub;
-  final spans = SpanCollection();
 
   void onEvent(RoomEvent event) {
     if (event is RoomLogEvent && event.name == "otel.trace") {
