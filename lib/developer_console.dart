@@ -172,7 +172,49 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
     });
   }
 
-  Widget _tabLabel(String label) => Text(label);
+  double _contrastRatio(Color a, Color b) {
+    final lighter = max(a.computeLuminance(), b.computeLuminance());
+    final darker = min(a.computeLuminance(), b.computeLuminance());
+    return (lighter + 0.05) / (darker + 0.05);
+  }
+
+  Color _defaultSelectedTabForeground(
+    ShadColorScheme colorScheme,
+    Color backgroundColor,
+  ) {
+    final foregroundContrast = _contrastRatio(
+      colorScheme.foreground,
+      backgroundColor,
+    );
+    final backgroundContrast = _contrastRatio(
+      colorScheme.background,
+      backgroundColor,
+    );
+    return foregroundContrast >= backgroundContrast
+        ? colorScheme.foreground
+        : colorScheme.background;
+  }
+
+  Widget _tabLabel(String label, DeveloperConsoleView tabView) {
+    final theme = ShadTheme.of(context);
+    final tabsTheme = theme.tabsTheme;
+    final selected = view == tabView;
+    final selectedBackgroundColor =
+        tabsTheme.tabSelectedBackgroundColor ?? theme.colorScheme.background;
+    final color = selected
+        ? tabsTheme.tabSelectedForegroundColor ??
+              tabsTheme.tabForegroundColor ??
+              _defaultSelectedTabForeground(
+                theme.colorScheme,
+                selectedBackgroundColor,
+              )
+        : tabsTheme.tabForegroundColor ?? theme.colorScheme.primary;
+
+    return Text(
+      label,
+      style: TextStyle(color: color, fontWeight: .w600),
+    );
+  }
 
   Widget terminalView(BuildContext context) {
     return Row(
@@ -309,13 +351,13 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
     return ColoredBox(
       color: cs.card,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: .stretch,
         children: [
           Padding(
             padding: EdgeInsets.only(top: 20, bottom: 8, left: 20),
             child: Row(
-              mainAxisSize: MainAxisSize.max,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: .max,
+              crossAxisAlignment: .start,
               children: [
                 SizedBox(
                   width: 300,
@@ -323,17 +365,14 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                     value: view,
                     onChanged: _setView,
                     tabs: [
+                      ShadTab(value: .logs, child: _tabLabel("Logs", .logs)),
                       ShadTab(
-                        value: DeveloperConsoleView.logs,
-                        child: _tabLabel("Logs"),
+                        value: .traces,
+                        child: _tabLabel("Traces", .traces),
                       ),
                       ShadTab(
-                        value: DeveloperConsoleView.traces,
-                        child: _tabLabel("Traces"),
-                      ),
-                      ShadTab(
-                        value: DeveloperConsoleView.metrics,
-                        child: _tabLabel("Metrics"),
+                        value: .metrics,
+                        child: _tabLabel("Metrics", .metrics),
                       ),
                     ],
                   ),
@@ -346,16 +385,16 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                     onChanged: _setView,
                     tabs: [
                       ShadTab(
-                        value: DeveloperConsoleView.images,
-                        child: _tabLabel("Images"),
+                        value: .images,
+                        child: _tabLabel("Images", .images),
                       ),
                       ShadTab(
-                        value: DeveloperConsoleView.containers,
-                        child: _tabLabel("Containers"),
+                        value: .containers,
+                        child: _tabLabel("Containers", .containers),
                       ),
                       ShadTab(
-                        value: DeveloperConsoleView.services,
-                        child: _tabLabel("Services"),
+                        value: .services,
+                        child: _tabLabel("Services", .services),
                       ),
                     ],
                   ),
@@ -368,8 +407,8 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                     onChanged: _setView,
                     tabs: [
                       ShadTab(
-                        value: DeveloperConsoleView.terminal,
-                        child: _tabLabel("Terminal"),
+                        value: .terminal,
+                        child: _tabLabel("Terminal", .terminal),
                       ),
                     ],
                   ),
@@ -454,7 +493,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
               ),
               DeveloperConsoleView.terminal => terminalView(context),
               DeveloperConsoleView.images => Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment: .stretch,
                 children: [
                   Padding(
                     padding: EdgeInsetsGeometry.symmetric(horizontal: 20),
@@ -516,6 +555,7 @@ class _LiveLogsViewerState extends State<LiveLogsViewer> {
   @override
   void initState() {
     super.initState();
+
     sub = widget.client?.listen(onRoomEvent);
   }
 
