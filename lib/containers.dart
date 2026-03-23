@@ -1467,7 +1467,9 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                                 ),
                                 id: v.name,
                                 initialValue:
-                                    _vars[v.name] ?? v.enumValues!.first,
+                                    v.enumValues!.contains(_vars[v.name])
+                                    ? _vars[v.name]
+                                    : v.enumValues!.first,
                                 selectedOptionBuilder: (context, value) =>
                                     Text(value),
                                 options: [
