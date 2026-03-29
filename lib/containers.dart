@@ -10,8 +10,28 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:flutter_solidart/flutter_solidart.dart';
 
-Future<String?> promptForCommand(BuildContext context) async {
-  String messageText = "/bin/bash -il";
+class TerminalLaunchOptions {
+  const TerminalLaunchOptions({
+    required this.command,
+    this.mountRoomStorage = false,
+  });
+
+  final String command;
+  final bool mountRoomStorage;
+}
+
+const _mountRoomStorageDescription = "Mounts room storage at /data.";
+
+ContainerMountSpec _roomStorageMountSpec() =>
+    ContainerMountSpec(room: [RoomStorageMountSpec(path: "/data")]);
+
+Future<TerminalLaunchOptions?> promptForCommand(
+  BuildContext context, {
+  bool showMountRoomStorage = false,
+  String? mountRoomStorageDescription,
+}) async {
+  String command = "/bin/bash -il";
+  var mountRoomStorage = false;
   return await showShadDialog(
     context: context,
     builder: (context) => ShadDialog.alert(
@@ -24,29 +44,57 @@ Future<String?> promptForCommand(BuildContext context) async {
         ),
         ShadButton(
           onPressed: () {
-            Navigator.of(context).pop(messageText);
+            Navigator.of(context).pop(
+              TerminalLaunchOptions(
+                command: command,
+                mountRoomStorage: mountRoomStorage,
+              ),
+            );
           },
           child: Text("Send"),
         ),
       ],
       title: Text("Launch Terminal"),
-      description: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: 400),
-        child: ShadInputFormField(
-          initialValue: "/bin/bash -il",
-          description: Text(
-            "Enter an interactive terminal command to launch it in a terminal",
-          ),
-          onChanged: (value) {
-            messageText = value;
-          },
-          textAlign: TextAlign.start,
+      description: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: 400),
+            child: ShadInputFormField(
+              initialValue: "/bin/bash -il",
+              description: Text(
+                "Enter an interactive terminal command to launch it in a terminal",
+              ),
+              onChanged: (value) {
+                command = value;
+              },
+              textAlign: TextAlign.start,
 
-          style: GoogleFonts.sourceCodePro(
-            color: Color.from(alpha: 1, red: .8, green: .8, blue: .8),
-            fontWeight: FontWeight.w500,
+              style: GoogleFonts.sourceCodePro(
+                color: Color.from(alpha: 1, red: .8, green: .8, blue: .8),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
-        ),
+          if (showMountRoomStorage) ...[
+            SizedBox(height: 16),
+            ShadCheckboxFormField(
+              initialValue: mountRoomStorage,
+              onChanged: (value) {
+                mountRoomStorage = value == true;
+              },
+              inputLabel: Text("mount room storage"),
+            ),
+            if (mountRoomStorageDescription != null) ...[
+              SizedBox(height: 4),
+              Text(
+                mountRoomStorageDescription,
+                style: ShadTheme.of(context).textTheme.muted,
+              ),
+            ],
+          ],
+        ],
       ),
     ),
   );
@@ -138,8 +186,13 @@ class _ImageTableState extends State<ImageTable> {
                         tooltip: 'Run',
                         onPressed: () async {
                           try {
-                            final command = await promptForCommand(context);
-                            if (command == null) {
+                            final launchOptions = await promptForCommand(
+                              context,
+                              showMountRoomStorage: true,
+                              mountRoomStorageDescription:
+                                  _mountRoomStorageDescription,
+                            );
+                            if (launchOptions == null) {
                               return;
                             }
 
@@ -150,12 +203,15 @@ class _ImageTableState extends State<ImageTable> {
                                       ? img.tags.first
                                       : img.id,
                                   writableRootFs: true,
+                                  mounts: launchOptions.mountRoomStorage
+                                      ? _roomStorageMountSpec()
+                                      : null,
                                 );
 
                             final tty = widget.client.containers.exec(
                               containerId: containerId,
                               tty: true,
-                              command: command,
+                              command: launchOptions.command,
                             );
 
                             if (!mounted) return;
@@ -367,21 +423,48 @@ class _ContainerTableState extends State<ContainerTable> {
                                       tooltip: 'Run',
                                       onPressed: () async {
                                         try {
-                                          final command =
-                                              await promptForCommand(context);
-                                          if (command == null) {
+                                          final launchOptions =
+                                              await promptForCommand(
+                                                context,
+                                                showMountRoomStorage: true,
+                                                mountRoomStorageDescription:
+                                                    _mountRoomStorageDescription,
+                                              );
+                                          if (launchOptions == null) {
                                             return;
                                           }
-                                          final tty = widget.client.containers
-                                              .exec(
-                                                containerId: c.id,
-                                                tty: true,
-                                                command: command,
-                                              );
+                                          late final ExecSession tty;
+                                          if (launchOptions.mountRoomStorage) {
+                                            final containerId = await widget
+                                                .client
+                                                .containers
+                                                .run(
+                                                  image: c.image,
+                                                  command: "sleep infinity",
+                                                  writableRootFs: true,
+                                                  private: true,
+                                                  mounts:
+                                                      _roomStorageMountSpec(),
+                                                );
+                                            tty = widget.client.containers.exec(
+                                              containerId: containerId,
+                                              tty: true,
+                                              command: launchOptions.command,
+                                            );
+                                          } else {
+                                            tty = widget.client.containers.exec(
+                                              containerId: c.id,
+                                              tty: true,
+                                              command: launchOptions.command,
+                                            );
+                                          }
 
                                           if (!mounted) return;
 
                                           widget.onRun(tty);
+                                          if (launchOptions.mountRoomStorage) {
+                                            containersResource.refresh();
+                                          }
 
                                           ShadToaster.of(context).show(
                                             const ShadToast(
