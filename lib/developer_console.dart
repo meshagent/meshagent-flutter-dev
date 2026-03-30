@@ -237,6 +237,19 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                     onPressed: adding
                         ? null
                         : () async {
+                            final launchOptions = await promptForImageTerminal(
+                              context,
+                              initialCommand: "bash -l",
+                              initialRoomMounts: [
+                                RoomStorageMountSpec(
+                                  path: "/data",
+                                  readOnly: false,
+                                ),
+                              ],
+                            );
+                            if (launchOptions == null) {
+                              return;
+                            }
                             setState(() {
                               adding = true;
                             });
@@ -245,7 +258,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                                   .run(
                                     image: widget.shellImage,
                                     command: "sleep infinity",
-                                    mountPath: "/data",
+                                    mounts: launchOptions.mounts,
                                     writableRootFs: true,
                                     env: {
                                       "OPENAI_API_KEY":
@@ -262,7 +275,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
 
                               final run = widget.room.containers.exec(
                                 containerId: containerId,
-                                command: "bash -l",
+                                command: launchOptions.command,
                                 tty: true,
                               );
                               if (!mounted) {

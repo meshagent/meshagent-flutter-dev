@@ -11,93 +11,461 @@ import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:flutter_solidart/flutter_solidart.dart';
 
 class TerminalLaunchOptions {
-  const TerminalLaunchOptions({
-    required this.command,
-    this.mountRoomStorage = false,
-  });
+  const TerminalLaunchOptions({required this.command, this.mounts});
 
   final String command;
-  final bool mountRoomStorage;
+  final ContainerMountSpec? mounts;
 }
 
-const _mountRoomStorageDescription = "Mounts room storage at /data.";
-
-ContainerMountSpec _roomStorageMountSpec() =>
-    ContainerMountSpec(room: [RoomStorageMountSpec(path: "/data")]);
-
-Future<TerminalLaunchOptions?> promptForCommand(
-  BuildContext context, {
-  bool showMountRoomStorage = false,
-  String? mountRoomStorageDescription,
-}) async {
-  String command = "/bin/bash -il";
-  var mountRoomStorage = false;
-  return await showShadDialog(
+Future<TerminalLaunchOptions?> promptForContainerTerminal(
+  BuildContext context,
+) async {
+  return showShadDialog<TerminalLaunchOptions>(
     context: context,
-    builder: (context) => ShadDialog.alert(
+    builder: (context) => const _TerminalLaunchDialog(),
+  );
+}
+
+Future<TerminalLaunchOptions?> promptForImageTerminal(
+  BuildContext context, {
+  String initialCommand = "/bin/bash -il",
+  List<RoomStorageMountSpec> initialRoomMounts = const [],
+  List<ImageStorageMountSpec> initialImageMounts = const [],
+}) async {
+  return showShadDialog<TerminalLaunchOptions>(
+    context: context,
+    builder: (context) => _TerminalLaunchDialog(
+      allowRoomMounts: true,
+      allowImageMounts: true,
+      initialCommand: initialCommand,
+      initialRoomMounts: initialRoomMounts,
+      initialImageMounts: initialImageMounts,
+    ),
+  );
+}
+
+class _EditableRoomMount {
+  _EditableRoomMount({
+    String path = "",
+    String subpath = "",
+    this.readOnly = false,
+  }) : pathController = TextEditingController(text: path),
+       subpathController = TextEditingController(text: subpath);
+
+  final TextEditingController pathController;
+  final TextEditingController subpathController;
+  bool readOnly;
+
+  void dispose() {
+    pathController.dispose();
+    subpathController.dispose();
+  }
+}
+
+class _EditableImageMount {
+  _EditableImageMount({
+    String image = "",
+    String path = "",
+    this.readOnly = true,
+  }) : imageController = TextEditingController(text: image),
+       pathController = TextEditingController(text: path);
+
+  final TextEditingController imageController;
+  final TextEditingController pathController;
+  bool readOnly;
+
+  void dispose() {
+    imageController.dispose();
+    pathController.dispose();
+  }
+}
+
+class _TerminalLaunchDialog extends StatefulWidget {
+  const _TerminalLaunchDialog({
+    this.allowRoomMounts = false,
+    this.allowImageMounts = false,
+    this.initialCommand = "/bin/bash -il",
+    this.initialRoomMounts = const [],
+    this.initialImageMounts = const [],
+  });
+
+  final bool allowRoomMounts;
+  final bool allowImageMounts;
+  final String initialCommand;
+  final List<RoomStorageMountSpec> initialRoomMounts;
+  final List<ImageStorageMountSpec> initialImageMounts;
+
+  @override
+  State<_TerminalLaunchDialog> createState() => _TerminalLaunchDialogState();
+}
+
+class _TerminalLaunchDialogState extends State<_TerminalLaunchDialog> {
+  late final TextEditingController _commandController;
+  late final List<_EditableRoomMount> _roomMounts;
+  late final List<_EditableImageMount> _imageMounts;
+  String? _validationError;
+
+  @override
+  void initState() {
+    super.initState();
+    _commandController = TextEditingController(text: widget.initialCommand);
+    _roomMounts = [
+      for (final mount in widget.initialRoomMounts)
+        _EditableRoomMount(
+          path: mount.path,
+          subpath: mount.subpath ?? "",
+          readOnly: mount.readOnly ?? false,
+        ),
+    ];
+    _imageMounts = [
+      for (final mount in widget.initialImageMounts)
+        _EditableImageMount(
+          image: mount.image,
+          path: mount.path,
+          readOnly: mount.readOnly,
+        ),
+    ];
+  }
+
+  @override
+  void dispose() {
+    _commandController.dispose();
+    for (final mount in _roomMounts) {
+      mount.dispose();
+    }
+    for (final mount in _imageMounts) {
+      mount.dispose();
+    }
+    super.dispose();
+  }
+
+  TerminalLaunchOptions? _buildLaunchOptions() {
+    final roomMounts = <RoomStorageMountSpec>[];
+    for (final mount in _roomMounts) {
+      final path = mount.pathController.text.trim();
+      final subpath = mount.subpathController.text.trim();
+      if (path.isEmpty && subpath.isEmpty) {
+        continue;
+      }
+      if (path.isEmpty) {
+        _validationError = "Room mount path is required.";
+        return null;
+      }
+      roomMounts.add(
+        RoomStorageMountSpec(
+          path: path,
+          subpath: subpath.isEmpty ? null : subpath,
+          readOnly: mount.readOnly,
+        ),
+      );
+    }
+
+    final imageMounts = <ImageStorageMountSpec>[];
+    for (final mount in _imageMounts) {
+      final image = mount.imageController.text.trim();
+      final path = mount.pathController.text.trim();
+      if (image.isEmpty && path.isEmpty) {
+        continue;
+      }
+      if (image.isEmpty || path.isEmpty) {
+        _validationError = "Image mounts require both an image and a path.";
+        return null;
+      }
+      imageMounts.add(
+        ImageStorageMountSpec(
+          image: image,
+          path: path,
+          readOnly: mount.readOnly,
+        ),
+      );
+    }
+
+    _validationError = null;
+    final hasMounts = roomMounts.isNotEmpty || imageMounts.isNotEmpty;
+    final mounts = ContainerMountSpec(
+      room: roomMounts.isEmpty ? null : roomMounts,
+      images: imageMounts.isEmpty ? null : imageMounts,
+    );
+    return TerminalLaunchOptions(
+      command: _commandController.text,
+      mounts: hasMounts ? mounts : null,
+    );
+  }
+
+  Widget _mountSection({
+    required String title,
+    required String description,
+    required VoidCallback onAdd,
+    required String addLabel,
+    required List<Widget> children,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: ShadTheme.of(context).textTheme.large),
+        const SizedBox(height: 4),
+        Text(description, style: ShadTheme.of(context).textTheme.muted),
+        const SizedBox(height: 12),
+        if (children.isEmpty)
+          Text(
+            "No mounts configured.",
+            style: ShadTheme.of(context).textTheme.muted,
+          )
+        else
+          ...children,
+        const SizedBox(height: 12),
+        ShadButton.outline(
+          onPressed: onAdd,
+          leading: const Icon(LucideIcons.plus),
+          child: Text(addLabel),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ShadDialog(
+      title: const Text("Launch Terminal"),
+      constraints: const BoxConstraints(maxWidth: 760, maxHeight: 760),
+      child: SizedBox(
+        width: 760,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ShadInputFormField(
+                controller: _commandController,
+                description: const Text(
+                  "Enter an interactive terminal command to launch it in a terminal",
+                ),
+                textAlign: TextAlign.start,
+                style: GoogleFonts.sourceCodePro(
+                  color: const Color.from(
+                    alpha: 1,
+                    red: .8,
+                    green: .8,
+                    blue: .8,
+                  ),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (widget.allowRoomMounts) ...[
+                const SizedBox(height: 20),
+                _mountSection(
+                  title: "Room Mounts",
+                  description:
+                      "Mount room storage paths into the launched container.",
+                  onAdd: () {
+                    setState(() {
+                      _roomMounts.add(_EditableRoomMount());
+                    });
+                  },
+                  addLabel: "Add room mount",
+                  children: [
+                    for (final mount in _roomMounts)
+                      Padding(
+                        key: ObjectKey(mount),
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _RoomMountEditor(
+                          mount: mount,
+                          onChanged: () => setState(() {}),
+                          onRemove: () {
+                            setState(() {
+                              _roomMounts.remove(mount);
+                              mount.dispose();
+                            });
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              if (widget.allowImageMounts) ...[
+                const SizedBox(height: 20),
+                _mountSection(
+                  title: "Image Mounts",
+                  description:
+                      "Mount the contents of other images into the launched container.",
+                  onAdd: () {
+                    setState(() {
+                      _imageMounts.add(_EditableImageMount());
+                    });
+                  },
+                  addLabel: "Add image mount",
+                  children: [
+                    for (final mount in _imageMounts)
+                      Padding(
+                        key: ObjectKey(mount),
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _ImageMountEditor(
+                          mount: mount,
+                          onChanged: () => setState(() {}),
+                          onRemove: () {
+                            setState(() {
+                              _imageMounts.remove(mount);
+                              mount.dispose();
+                            });
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              if (_validationError != null) ...[
+                const SizedBox(height: 16),
+                Text(
+                  _validationError!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
       actions: [
         ShadButton.secondary(
           onPressed: () {
             Navigator.of(context).pop();
           },
-          child: Text("Cancel"),
+          child: const Text("Cancel"),
         ),
         ShadButton(
           onPressed: () {
-            Navigator.of(context).pop(
-              TerminalLaunchOptions(
-                command: command,
-                mountRoomStorage: mountRoomStorage,
-              ),
-            );
+            final options = _buildLaunchOptions();
+            if (options == null) {
+              setState(() {});
+              return;
+            }
+            Navigator.of(context).pop(options);
           },
-          child: Text("Send"),
+          child: const Text("Send"),
         ),
       ],
-      title: Text("Launch Terminal"),
-      description: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: 400),
-            child: ShadInputFormField(
-              initialValue: "/bin/bash -il",
-              description: Text(
-                "Enter an interactive terminal command to launch it in a terminal",
-              ),
-              onChanged: (value) {
-                command = value;
-              },
-              textAlign: TextAlign.start,
+    );
+  }
+}
 
-              style: GoogleFonts.sourceCodePro(
-                color: Color.from(alpha: 1, red: .8, green: .8, blue: .8),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          if (showMountRoomStorage) ...[
-            SizedBox(height: 16),
-            ShadCheckboxFormField(
-              initialValue: mountRoomStorage,
-              onChanged: (value) {
-                mountRoomStorage = value == true;
-              },
-              inputLabel: Text("mount room storage"),
-            ),
-            if (mountRoomStorageDescription != null) ...[
-              SizedBox(height: 4),
-              Text(
-                mountRoomStorageDescription,
-                style: ShadTheme.of(context).textTheme.muted,
-              ),
-            ],
-          ],
-        ],
+class _RoomMountEditor extends StatelessWidget {
+  const _RoomMountEditor({
+    required this.mount,
+    required this.onChanged,
+    required this.onRemove,
+  });
+
+  final _EditableRoomMount mount;
+  final VoidCallback onChanged;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(8),
       ),
-    ),
-  );
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ShadInputFormField(
+              controller: mount.pathController,
+              label: const Text("Path"),
+              description: const Text(
+                "Mount path inside the launched container.",
+              ),
+            ),
+            const SizedBox(height: 12),
+            ShadInputFormField(
+              controller: mount.subpathController,
+              label: const Text("Subpath"),
+              description: const Text("Optional room storage subpath."),
+            ),
+            const SizedBox(height: 12),
+            ShadCheckboxFormField(
+              initialValue: mount.readOnly,
+              onChanged: (value) {
+                mount.readOnly = value;
+                onChanged();
+              },
+              inputLabel: const Text("Read only"),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ShadButton.outline(
+                onPressed: onRemove,
+                leading: const Icon(Icons.delete_outline),
+                child: const Text("Remove"),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ImageMountEditor extends StatelessWidget {
+  const _ImageMountEditor({
+    required this.mount,
+    required this.onChanged,
+    required this.onRemove,
+  });
+
+  final _EditableImageMount mount;
+  final VoidCallback onChanged;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ShadInputFormField(
+              controller: mount.imageController,
+              label: const Text("Image"),
+              description: const Text("Image tag to mount into the container."),
+            ),
+            const SizedBox(height: 12),
+            ShadInputFormField(
+              controller: mount.pathController,
+              label: const Text("Path"),
+              description: const Text(
+                "Mount path inside the launched container.",
+              ),
+            ),
+            const SizedBox(height: 12),
+            ShadCheckboxFormField(
+              initialValue: mount.readOnly,
+              onChanged: (value) {
+                mount.readOnly = value;
+                onChanged();
+              },
+              inputLabel: const Text("Read only"),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ShadButton.outline(
+                onPressed: onRemove,
+                leading: const Icon(Icons.delete_outline),
+                child: const Text("Remove"),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class ImageTable extends StatefulWidget {
@@ -186,11 +554,8 @@ class _ImageTableState extends State<ImageTable> {
                         tooltip: 'Run',
                         onPressed: () async {
                           try {
-                            final launchOptions = await promptForCommand(
+                            final launchOptions = await promptForImageTerminal(
                               context,
-                              showMountRoomStorage: true,
-                              mountRoomStorageDescription:
-                                  _mountRoomStorageDescription,
                             );
                             if (launchOptions == null) {
                               return;
@@ -203,9 +568,7 @@ class _ImageTableState extends State<ImageTable> {
                                       ? img.tags.first
                                       : img.id,
                                   writableRootFs: true,
-                                  mounts: launchOptions.mountRoomStorage
-                                      ? _roomStorageMountSpec()
-                                      : null,
+                                  mounts: launchOptions.mounts,
                                 );
 
                             final tty = widget.client.containers.exec(
@@ -424,47 +787,22 @@ class _ContainerTableState extends State<ContainerTable> {
                                       onPressed: () async {
                                         try {
                                           final launchOptions =
-                                              await promptForCommand(
+                                              await promptForContainerTerminal(
                                                 context,
-                                                showMountRoomStorage: true,
-                                                mountRoomStorageDescription:
-                                                    _mountRoomStorageDescription,
                                               );
                                           if (launchOptions == null) {
                                             return;
                                           }
-                                          late final ExecSession tty;
-                                          if (launchOptions.mountRoomStorage) {
-                                            final containerId = await widget
-                                                .client
-                                                .containers
-                                                .run(
-                                                  image: c.image,
-                                                  command: "sleep infinity",
-                                                  writableRootFs: true,
-                                                  private: true,
-                                                  mounts:
-                                                      _roomStorageMountSpec(),
-                                                );
-                                            tty = widget.client.containers.exec(
-                                              containerId: containerId,
-                                              tty: true,
-                                              command: launchOptions.command,
-                                            );
-                                          } else {
-                                            tty = widget.client.containers.exec(
-                                              containerId: c.id,
-                                              tty: true,
-                                              command: launchOptions.command,
-                                            );
-                                          }
+                                          final tty = widget.client.containers
+                                              .exec(
+                                                containerId: c.id,
+                                                tty: true,
+                                                command: launchOptions.command,
+                                              );
 
                                           if (!mounted) return;
 
                                           widget.onRun(tty);
-                                          if (launchOptions.mountRoomStorage) {
-                                            containersResource.refresh();
-                                          }
 
                                           ShadToaster.of(context).show(
                                             const ShadToast(
