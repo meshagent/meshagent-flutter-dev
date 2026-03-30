@@ -481,23 +481,32 @@ class ImageTable extends StatefulWidget {
 class _ImageTableState extends State<ImageTable> {
   late Future<List<ContainerImage>> _imagesFuture;
 
+  String _displayImageRef(ContainerImage image) {
+    if (image.tags.isNotEmpty) {
+      return image.tags.first;
+    }
+    return image.id;
+  }
+
+  List<ContainerImage> _sortImages(List<ContainerImage> images) {
+    images.sort((a, b) => _displayImageRef(a).compareTo(_displayImageRef(b)));
+    return images;
+  }
+
   @override
   void initState() {
     super.initState();
     _timer = Timer.periodic(Duration(seconds: 1), _onTick);
-    _imagesFuture = widget.client.containers.listImages().then(
-      (images) => images..sort((a, b) => a.tags[0].compareTo(b.tags[0])),
-    );
+    _imagesFuture = widget.client.containers.listImages().then(_sortImages);
   }
 
   late Timer _timer;
 
   void _onTick(Timer t) {
     widget.client.containers.listImages().then((images) {
-      images.sort((a, b) => a.tags[0].compareTo(b.tags[0]));
       if (mounted) {
         setState(() {
-          _imagesFuture = SynchronousFuture(images);
+          _imagesFuture = SynchronousFuture(_sortImages(images));
         });
       }
     });
@@ -512,9 +521,7 @@ class _ImageTableState extends State<ImageTable> {
   /// Force a re‑query after an image is removed
   Future<void> _reload() async {
     setState(() {
-      _imagesFuture = widget.client.containers.listImages().then(
-        (images) => images..sort((a, b) => a.tags[0].compareTo(b.tags[0])),
-      );
+      _imagesFuture = widget.client.containers.listImages().then(_sortImages);
     });
   }
 
@@ -564,9 +571,7 @@ class _ImageTableState extends State<ImageTable> {
                             final containerId = await widget.client.containers
                                 .run(
                                   command: "sleep infinity",
-                                  image: img.tags.isNotEmpty
-                                      ? img.tags.first
-                                      : img.id,
+                                  image: _displayImageRef(img),
                                   writableRootFs: true,
                                   mounts: launchOptions.mounts,
                                 );
@@ -606,9 +611,7 @@ class _ImageTableState extends State<ImageTable> {
                           SizedBox(width: 10),
                           Expanded(
                             child: SelectableText(
-                              img.tags.isNotEmpty
-                                  ? img.tags.first
-                                  : '(untagged)',
+                              _displayImageRef(img),
                               style: TextStyle(),
                             ),
                           ),
@@ -633,11 +636,7 @@ class _ImageTableState extends State<ImageTable> {
                                 context: context,
                                 builder: (ctx) => ShadDialog(
                                   title: const Text('Delete image?'),
-                                  child: Text(
-                                    img.tags.isNotEmpty
-                                        ? img.tags.first
-                                        : img.id,
-                                  ),
+                                  child: Text(_displayImageRef(img)),
                                   actions: [
                                     ShadButton.secondary(
                                       onPressed: () =>
@@ -656,9 +655,7 @@ class _ImageTableState extends State<ImageTable> {
 
                           try {
                             await widget.client.containers.deleteImage(
-                              image: img.tags.isNotEmpty
-                                  ? img.tags.first
-                                  : img.id,
+                              image: _displayImageRef(img),
                             );
                             ShadToaster.of(context).show(
                               const ShadToast(
