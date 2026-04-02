@@ -25,21 +25,83 @@ dynamic trimStrings(dynamic v) {
 class SpanCollection extends Iterable<Span> {
   SpanCollection();
 
+  static const DeepCollectionEquality _spanEquality = DeepCollectionEquality();
+
   final List<Span> _spans = [];
   final List<Span> _rootSpans = [];
   final Map<String, List<Span>> _childSpans = {};
+  final Map<String, Span> _spansById = {};
 
-  void add(Span span) {
-    _spans.add(span);
-    final parentSpanId = span.parentSpanId;
-    if (parentSpanId != null) {
-      if (!_childSpans.containsKey(parentSpanId)) {
-        _childSpans[parentSpanId] = [];
+  static String _spanKey(Span span) => "${span.traceId}/${span.spanId}";
+
+  bool add(Span span) {
+    final key = _spanKey(span);
+    final existing = _spansById[key];
+    if (existing != null) {
+      if (_spanEquality.equals(existing.toJson(), span.toJson())) {
+        return false;
       }
-      _childSpans[parentSpanId]!.add(span);
-    } else {
-      _rootSpans.add(span);
+      _replaceSpan(existing: existing, replacement: span);
+      _spansById[key] = span;
+      return true;
     }
+
+    _spansById[key] = span;
+    _spans.add(span);
+    _insertIntoTree(span);
+    return true;
+  }
+
+  void _insertIntoTree(Span span) {
+    final parentSpanId = span.parentSpanId;
+    if (parentSpanId == null) {
+      _rootSpans.add(span);
+      return;
+    }
+
+    _childSpans.putIfAbsent(parentSpanId, () => []).add(span);
+  }
+
+  void _removeFromTree(Span span) {
+    final parentSpanId = span.parentSpanId;
+    if (parentSpanId == null) {
+      _rootSpans.remove(span);
+      return;
+    }
+
+    final children = _childSpans[parentSpanId];
+    if (children == null) {
+      return;
+    }
+    children.remove(span);
+    if (children.isEmpty) {
+      _childSpans.remove(parentSpanId);
+    }
+  }
+
+  void _replaceSpan({required Span existing, required Span replacement}) {
+    final spanIndex = _spans.indexOf(existing);
+    if (spanIndex == -1) {
+      _spans.add(replacement);
+    } else {
+      _spans[spanIndex] = replacement;
+    }
+
+    if (existing.parentSpanId == replacement.parentSpanId) {
+      final siblings = existing.parentSpanId == null
+          ? _rootSpans
+          : _childSpans[existing.parentSpanId!]!;
+      final siblingIndex = siblings.indexOf(existing);
+      if (siblingIndex == -1) {
+        siblings.add(replacement);
+      } else {
+        siblings[siblingIndex] = replacement;
+      }
+      return;
+    }
+
+    _removeFromTree(existing);
+    _insertIntoTree(replacement);
   }
 
   Iterable<Span> getRootSpans() {
@@ -916,8 +978,7 @@ class _LiveTraceViewerState extends State<LiveTraceViewer> {
       for (final rs in trace.resourceSpans) {
         for (final ss in rs.scopeSpans) {
           for (final span in ss.spans) {
-            spans.add(span);
-            dirty = true;
+            dirty = spans.add(span) || dirty;
           }
         }
       }
