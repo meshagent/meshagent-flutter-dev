@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/intl.dart';
 import 'package:meshagent_flutter_dev/trace_viewer.dart';
 
 Span _span({
@@ -21,6 +22,19 @@ Span _span({
 }
 
 void main() {
+  group('timestamp formatting', () {
+    test('includes seconds and milliseconds', () {
+      final previousLocale = Intl.defaultLocale;
+      Intl.defaultLocale = 'en_US';
+      addTearDown(() => Intl.defaultLocale = previousLocale);
+
+      expect(
+        formatTraceViewerTimestamp(DateTime(2026, 4, 2, 14, 17, 23, 456)),
+        'Thursday, April 2, 2026 2:17:23.456 PM',
+      );
+    });
+  });
+
   group('SpanCollection', () {
     test('dedupes identical spans by trace and span id', () {
       final spans = SpanCollection();

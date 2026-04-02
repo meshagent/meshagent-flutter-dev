@@ -22,6 +22,27 @@ dynamic trimStrings(dynamic v) {
   return v;
 }
 
+final DateFormat _traceViewerTimestampFormatter = DateFormat(
+  'EEEE, MMMM d, y h:mm:ss.SSS a',
+);
+const double _traceTimelineBarHeight = 30.0;
+const double _traceTimelineBarPadding = 8.0;
+const double _traceTimelineRowHeight =
+    _traceTimelineBarHeight + (_traceTimelineBarPadding * 2);
+
+String formatTraceViewerTimestamp(DateTime timestamp) {
+  return _traceViewerTimestampFormatter.format(timestamp);
+}
+
+String formatTraceViewerTimestampFromUnixNano(int unixNano) {
+  return formatTraceViewerTimestamp(
+    DateTime.fromMicrosecondsSinceEpoch(
+      (unixNano / 1000).toInt(),
+      isUtc: true,
+    ).toLocal(),
+  );
+}
+
 class SpanCollection extends Iterable<Span> {
   SpanCollection();
 
@@ -300,156 +321,161 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ShadGestureDetector(
-                  cursor: SystemMouseCursors.click,
-                  onTap: () {
-                    setState(() {
-                      expanded = !expanded;
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child:
-                        (widget.spans
-                            .getChildren(widget.node.spanId)
-                            .isNotEmpty)
-                        ? Icon(
-                            expanded
-                                ? LucideIcons.chevronDown
-                                : LucideIcons.chevronRight,
-                            color: node.status?.code == "STATUS_CODE_ERROR"
-                                ? Colors.red
-                                : colorScheme.foreground,
-                          )
-                        : Icon(
-                            LucideIcons.dot,
-                            color: node.status?.code == "STATUS_CODE_ERROR"
-                                ? Colors.red
-                                : colorScheme.foreground,
-                          ),
-                  ),
-                ),
-                Padding(
-                  padding: EdgeInsets.only(right: 10),
-                  child: switch (node.status?.code) {
-                    "STATUS_CODE_ERROR" => Icon(
-                      LucideIcons.bug,
-                      color: Colors.red,
-                    ),
-                    _ => Icon(
-                      LucideIcons.clock,
-                      color: ShadTheme.of(context).colorScheme.foreground,
-                    ),
-                  },
-                ),
-                SizedBox(
-                  width: 300 - widget.depth * 20,
-                  child: GestureDetector(
-                    onTap: () {
-                      showShadSheet(
-                        side: ShadSheetSide.right,
-                        context: context,
-                        builder: (context) => ShadSheet(
-                          title: Text("Span Details"),
-                          constraints: BoxConstraints(
-                            minWidth: 500,
-                            maxWidth: 500,
-                          ),
-                          child: SelectionArea(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text.rich(
-                                  TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: "timestamp: ",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      TextSpan(
-                                        text: DateFormat.yMMMMEEEEd()
-                                            .add_jm()
-                                            .format(
-                                              DateTime.fromMicrosecondsSinceEpoch(
-                                                (node.startTimeUnixNano / 1000)
-                                                    .toInt(),
-                                                isUtc: true,
-                                              ).toLocal(),
-                                            ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Text.rich(
-                                  TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: "duration: ",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      TextSpan(
-                                        text:
-                                            "${Duration(microseconds: ((node.endTimeUnixNano - node.startTimeUnixNano) / 1000).toInt()).inMilliseconds} ms",
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Text.rich(
-                                  TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: "name: ",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      TextSpan(text: node.name),
-                                    ],
-                                  ),
-                                ),
-
-                                for (final attribute in node.attributes)
-                                  Text.rich(
-                                    TextSpan(
-                                      children: [
-                                        TextSpan(
-                                          text: "${attribute.key}: ",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        TextSpan(text: "${attribute.value}"),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                    child: Text(
-                      duration == 0 ? node.name : "${node.name} (${duration}s)",
-                      maxLines: 1,
-                      textAlign: TextAlign.start,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: colorScheme.foreground,
-                        fontWeight: FontWeight.w500,
+            SizedBox(
+              height: _traceTimelineRowHeight,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ShadGestureDetector(
+                      cursor: SystemMouseCursors.click,
+                      onTap: () {
+                        setState(() {
+                          expanded = !expanded;
+                        });
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 10),
+                        child:
+                            (widget.spans
+                                .getChildren(widget.node.spanId)
+                                .isNotEmpty)
+                            ? Icon(
+                                expanded
+                                    ? LucideIcons.chevronDown
+                                    : LucideIcons.chevronRight,
+                                color: node.status?.code == "STATUS_CODE_ERROR"
+                                    ? Colors.red
+                                    : colorScheme.foreground,
+                              )
+                            : Icon(
+                                LucideIcons.dot,
+                                color: node.status?.code == "STATUS_CODE_ERROR"
+                                    ? Colors.red
+                                    : colorScheme.foreground,
+                              ),
                       ),
                     ),
-                  ),
+                    Padding(
+                      padding: EdgeInsets.only(right: 10),
+                      child: switch (node.status?.code) {
+                        "STATUS_CODE_ERROR" => Icon(
+                          LucideIcons.bug,
+                          color: Colors.red,
+                        ),
+                        _ => Icon(
+                          LucideIcons.clock,
+                          color: ShadTheme.of(context).colorScheme.foreground,
+                        ),
+                      },
+                    ),
+                    SizedBox(
+                      width: 300 - widget.depth * 20,
+                      child: GestureDetector(
+                        onTap: () {
+                          showShadSheet(
+                            side: ShadSheetSide.right,
+                            context: context,
+                            builder: (context) => ShadSheet(
+                              title: Text("Span Details"),
+                              constraints: BoxConstraints(
+                                minWidth: 500,
+                                maxWidth: 500,
+                              ),
+                              child: SelectionArea(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text.rich(
+                                      TextSpan(
+                                        children: [
+                                          TextSpan(
+                                            text: "timestamp: ",
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          TextSpan(
+                                            text:
+                                                formatTraceViewerTimestampFromUnixNano(
+                                                  node.startTimeUnixNano,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Text.rich(
+                                      TextSpan(
+                                        children: [
+                                          TextSpan(
+                                            text: "duration: ",
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          TextSpan(
+                                            text:
+                                                "${Duration(microseconds: ((node.endTimeUnixNano - node.startTimeUnixNano) / 1000).toInt()).inMilliseconds} ms",
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Text.rich(
+                                      TextSpan(
+                                        children: [
+                                          TextSpan(
+                                            text: "name: ",
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          TextSpan(text: node.name),
+                                        ],
+                                      ),
+                                    ),
+
+                                    for (final attribute in node.attributes)
+                                      Text.rich(
+                                        TextSpan(
+                                          children: [
+                                            TextSpan(
+                                              text: "${attribute.key}: ",
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            TextSpan(
+                                              text: "${attribute.value}",
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                        child: Text(
+                          duration == 0
+                              ? node.name
+                              : "${node.name} (${duration}s)",
+                          maxLines: 1,
+                          textAlign: TextAlign.start,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colorScheme.foreground,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
 
             Expanded(
@@ -457,10 +483,10 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: EdgeInsets.all(8),
+                    padding: EdgeInsets.all(_traceTimelineBarPadding),
                     child: LayoutBuilder(
                       builder: (context, constraints) => SizedBox(
-                        height: 30,
+                        height: _traceTimelineBarHeight,
                         child: Stack(
                           children: [
                             Positioned(
@@ -487,10 +513,10 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
                                               ),
                                         ),
                                         Text(
-                                          "Started: ${DateFormat.yMMMMEEEEd().add_jm().format(DateTime.fromMicrosecondsSinceEpoch((node.startTimeUnixNano / 1000).toInt(), isUtc: true).toLocal())}",
+                                          "Started: ${formatTraceViewerTimestampFromUnixNano(node.startTimeUnixNano)}",
                                         ),
                                         Text(
-                                          "Ended: ${DateFormat.yMMMMEEEEd().add_jm().format(DateTime.fromMicrosecondsSinceEpoch((node.startTimeUnixNano / 1000).toInt(), isUtc: true).toLocal())}",
+                                          "Ended: ${formatTraceViewerTimestampFromUnixNano(node.endTimeUnixNano)}",
                                         ),
                                         Text("Duration: ${duration}s"),
                                       ],
@@ -734,13 +760,9 @@ class _LiveLogViewer extends State<LiveLogViewer> {
                                         ),
                                       ),
                                       TextSpan(
-                                        text: DateFormat.yMMMMEEEEd()
-                                            .add_jm()
-                                            .format(
-                                              DateTime.fromMicrosecondsSinceEpoch(
-                                                (m.timeUnixNano / 1000).toInt(),
-                                                isUtc: true,
-                                              ).toLocal(),
+                                        text:
+                                            formatTraceViewerTimestampFromUnixNano(
+                                              m.timeUnixNano,
                                             ),
                                       ),
                                     ],
