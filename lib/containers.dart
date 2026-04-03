@@ -694,6 +694,36 @@ class ContainerTable extends StatefulWidget {
 }
 
 class _ContainerTableState extends State<ContainerTable> {
+  String _containerSortName(RoomContainer container) =>
+      (container.name?.trim().isNotEmpty ?? false)
+      ? container.name!.toLowerCase()
+      : container.id.toLowerCase();
+
+  String _containerSortImage(RoomContainer container) =>
+      container.image.toLowerCase();
+
+  String _containerSortStartedBy(RoomContainer container) =>
+      container.startedBy.name.toLowerCase();
+
+  int _compareContainers(RoomContainer a, RoomContainer b) {
+    var cmp = _containerSortName(a).compareTo(_containerSortName(b));
+    if (cmp != 0) {
+      return cmp;
+    }
+
+    cmp = _containerSortImage(a).compareTo(_containerSortImage(b));
+    if (cmp != 0) {
+      return cmp;
+    }
+
+    cmp = _containerSortStartedBy(a).compareTo(_containerSortStartedBy(b));
+    if (cmp != 0) {
+      return cmp;
+    }
+
+    return a.id.toLowerCase().compareTo(b.id.toLowerCase());
+  }
+
   @override
   void initState() {
     super.initState();
@@ -717,14 +747,7 @@ class _ContainerTableState extends State<ContainerTable> {
   late final containersResource = Resource<List<RoomContainer>>(
     () => widget.client.containers
         .list(all: all)
-        .then(
-          (containers) => containers
-            ..sort(
-              (a, b) => (a.name?.toLowerCase() ?? a.id.toLowerCase()).compareTo(
-                b.name?.toLowerCase() ?? b.id.toLowerCase(),
-              ),
-            ),
-        ),
+        .then((containers) => containers..sort(_compareContainers)),
   );
 
   @override
