@@ -974,9 +974,14 @@ class _LiveMetricsViewer extends State<LiveMetricsViewer> {
 }
 
 class LiveTraceViewer extends StatefulWidget {
-  const LiveTraceViewer({super.key, required this.events});
+  const LiveTraceViewer({
+    super.key,
+    required this.events,
+    this.searchQuery = "",
+  });
 
   final Stream<RoomEvent> events;
+  final String searchQuery;
 
   @override
   State createState() => _LiveTraceViewerState();
@@ -1017,9 +1022,96 @@ class _LiveTraceViewerState extends State<LiveTraceViewer> {
     super.dispose();
   }
 
+  String _spanKey(Span span) => "${span.traceId}/${span.spanId}";
+
+  bool _matchesQuery(Span span, String query) {
+    if (query.isEmpty) {
+      return true;
+    }
+
+    if (span.name.toLowerCase().contains(query)) {
+      return true;
+    }
+    if (span.traceId.toLowerCase().contains(query)) {
+      return true;
+    }
+    if (span.spanId.toLowerCase().contains(query)) {
+      return true;
+    }
+    if ((span.parentSpanId ?? "").toLowerCase().contains(query)) {
+      return true;
+    }
+    if ((span.status?.message ?? "").toLowerCase().contains(query)) {
+      return true;
+    }
+
+    for (final attribute in span.attributes) {
+      if (attribute.key.toLowerCase().contains(query)) {
+        return true;
+      }
+      if ("${attribute.value}".toLowerCase().contains(query)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  void _addDescendants(
+    Span span,
+    SpanCollection filteredSpans,
+    Map<String, List<Span>> childrenByKey,
+  ) {
+    filteredSpans.add(span);
+    for (final child in childrenByKey[_spanKey(span)] ?? const <Span>[]) {
+      _addDescendants(child, filteredSpans, childrenByKey);
+    }
+  }
+
+  SpanCollection _visibleSpans() {
+    final query = widget.searchQuery.trim().toLowerCase();
+    if (query.isEmpty) {
+      return spans;
+    }
+
+    final filteredSpans = SpanCollection();
+    final spansByKey = <String, Span>{};
+    final childrenByKey = <String, List<Span>>{};
+
+    for (final span in spans) {
+      spansByKey[_spanKey(span)] = span;
+      final parentSpanId = span.parentSpanId;
+      if (parentSpanId == null) {
+        continue;
+      }
+      childrenByKey
+          .putIfAbsent("${span.traceId}/$parentSpanId", () => <Span>[])
+          .add(span);
+    }
+
+    for (final span in spans) {
+      if (!_matchesQuery(span, query)) {
+        continue;
+      }
+
+      Span? current = span;
+      while (current != null) {
+        filteredSpans.add(current);
+        final parentSpanId = current.parentSpanId;
+        if (parentSpanId == null) {
+          break;
+        }
+        current = spansByKey["${current.traceId}/$parentSpanId"];
+      }
+      _addDescendants(span, filteredSpans, childrenByKey);
+    }
+
+    return filteredSpans;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ListView(children: [TraceViewer(spans: spans, depth: 1)]);
+    return ListView(children: [TraceViewer(spans: _visibleSpans(), depth: 1)]);
   }
 }
 

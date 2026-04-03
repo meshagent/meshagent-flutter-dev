@@ -100,6 +100,7 @@ class RoomDeveloperConsole extends StatefulWidget {
 class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
   DeveloperConsoleView view = DeveloperConsoleView.logs;
   String logFilter = "";
+  String traceFilter = "";
   LogLevelFilter logLevelFilter = LogLevelFilter.all;
   int logClearSignal = 0;
   bool adding = false;
@@ -168,6 +169,9 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
       if (nextView != DeveloperConsoleView.logs) {
         logFilter = "";
         logLevelFilter = LogLevelFilter.all;
+      }
+      if (nextView != DeveloperConsoleView.traces) {
+        traceFilter = "";
       }
     });
   }
@@ -429,7 +433,8 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
               ],
             ),
           ),
-          if (view == DeveloperConsoleView.logs)
+          if (view == DeveloperConsoleView.logs ||
+              view == DeveloperConsoleView.traces)
             Padding(
               padding: EdgeInsets.only(bottom: 10, left: 20, right: 20),
               child: Row(
@@ -437,49 +442,60 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                   SizedBox(
                     width: 420,
                     child: ShadInput(
-                      placeholder: Text("Filter..."),
+                      placeholder: Text(
+                        view == DeveloperConsoleView.traces
+                            ? "Filter traces..."
+                            : "Filter...",
+                      ),
                       onChanged: (value) {
                         setState(() {
-                          logFilter = value;
+                          if (view == DeveloperConsoleView.traces) {
+                            traceFilter = value;
+                          } else {
+                            logFilter = value;
+                          }
                         });
                       },
                     ),
                   ),
-                  SizedBox(width: 10),
-                  SizedBox(
-                    width: 180,
-                    child: ShadSelect<LogLevelFilter>(
-                      initialValue: logLevelFilter,
-                      onChanged: (value) {
+                  if (view == DeveloperConsoleView.logs) SizedBox(width: 10),
+                  if (view == DeveloperConsoleView.logs)
+                    SizedBox(
+                      width: 180,
+                      child: ShadSelect<LogLevelFilter>(
+                        initialValue: logLevelFilter,
+                        onChanged: (value) {
+                          setState(() {
+                            logLevelFilter = value ?? LogLevelFilter.all;
+                          });
+                        },
+                        selectedOptionBuilder: (context, value) =>
+                            Text(logLevelFilterLabel(value)),
+                        options: [
+                          for (final level in LogLevelFilter.values)
+                            ShadOption<LogLevelFilter>(
+                              value: level,
+                              child: Text(logLevelFilterLabel(level)),
+                            ),
+                        ],
+                      ),
+                    ),
+                  if (view == DeveloperConsoleView.logs) SizedBox(width: 10),
+                  if (view == DeveloperConsoleView.logs)
+                    ShadButton.ghost(
+                      leading: Icon(LucideIcons.trash, size: 16),
+                      onPressed: () {
                         setState(() {
-                          logLevelFilter = value ?? LogLevelFilter.all;
+                          widget.events.removeWhere(
+                            (event) =>
+                                event is RoomLogEvent &&
+                                event.name == "otel.log",
+                          );
+                          logClearSignal++;
                         });
                       },
-                      selectedOptionBuilder: (context, value) =>
-                          Text(logLevelFilterLabel(value)),
-                      options: [
-                        for (final level in LogLevelFilter.values)
-                          ShadOption<LogLevelFilter>(
-                            value: level,
-                            child: Text(logLevelFilterLabel(level)),
-                          ),
-                      ],
+                      child: Text("Clear Logs"),
                     ),
-                  ),
-                  SizedBox(width: 10),
-                  ShadButton.ghost(
-                    leading: Icon(LucideIcons.trash, size: 16),
-                    onPressed: () {
-                      setState(() {
-                        widget.events.removeWhere(
-                          (event) =>
-                              event is RoomLogEvent && event.name == "otel.log",
-                        );
-                        logClearSignal++;
-                      });
-                    },
-                    child: Text("Clear Logs"),
-                  ),
                 ],
               ),
             ),
@@ -489,6 +505,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                 events: Stream.fromIterable(
                   widget.events,
                 ).followedBy(widget.room.events),
+                searchQuery: traceFilter,
               ),
               DeveloperConsoleView.logs => LiveLogViewer(
                 events: Stream.fromIterable(
