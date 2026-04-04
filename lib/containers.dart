@@ -1658,17 +1658,41 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
   @override
   void initState() {
     super.initState();
-    final initial = <String, String>{};
-    for (final v in widget.spec.variables ?? []) {
-      initial[v.name] = '';
-    }
+    final initial = <String, String>{
+      for (final variable
+          in widget.spec.variables ?? <ServiceTemplateVariable>[])
+        variable.name: _initialVariableValue(variable),
+    };
     if (widget.prefilledVars != null) {
       initial.addAll(widget.prefilledVars!);
     }
+    _normalizeEnumValues(initial);
     _vars = initial;
     _routeSubdomains = {};
     _routeSuffixes = {};
     _initRouteParts();
+  }
+
+  String _initialVariableValue(ServiceTemplateVariable variable) {
+    final enumValues = variable.enumValues;
+    if (enumValues != null && enumValues.isNotEmpty) {
+      return enumValues.first;
+    }
+    return '';
+  }
+
+  void _normalizeEnumValues(Map<String, String> values) {
+    for (final variable
+        in widget.spec.variables ?? <ServiceTemplateVariable>[]) {
+      final enumValues = variable.enumValues;
+      if (enumValues == null || enumValues.isEmpty) {
+        continue;
+      }
+      final currentValue = values[variable.name]?.trim() ?? '';
+      values[variable.name] = enumValues.contains(currentValue)
+          ? currentValue
+          : enumValues.first;
+    }
   }
 
   List<String> get _routeDomains => widget.routeDomains;
