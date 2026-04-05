@@ -75,8 +75,9 @@ enum DeveloperConsoleView {
   metrics,
   terminal,
   containers,
-  services,
   images,
+  registry,
+  services,
 }
 
 class RoomDeveloperConsole extends StatefulWidget {
@@ -396,18 +397,22 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                 ),
                 SizedBox(width: 15),
                 SizedBox(
-                  width: 420,
+                  width: 560,
                   child: ShadTabs<DeveloperConsoleView>(
                     value: view,
                     onChanged: _setView,
                     tabs: [
                       ShadTab(
+                        value: .containers,
+                        child: _tabLabel("Containers", .containers),
+                      ),
+                      ShadTab(
                         value: .images,
                         child: _tabLabel("Images", .images),
                       ),
                       ShadTab(
-                        value: .containers,
-                        child: _tabLabel("Containers", .containers),
+                        value: .registry,
+                        child: _tabLabel("Registry", .registry),
                       ),
                       ShadTab(
                         value: .services,
@@ -553,6 +558,9 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
               DeveloperConsoleView.containers => ContainerTable(
                 client: widget.room,
                 onRun: onRun,
+              ),
+              DeveloperConsoleView.registry => RegistryTable(
+                client: widget.room,
               ),
               DeveloperConsoleView.services => ServiceTable(
                 client: widget.room,

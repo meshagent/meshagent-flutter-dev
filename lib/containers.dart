@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:meshagent/meshagent.dart';
 import './ansi.dart';
@@ -9,6 +10,46 @@ import './ansi.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:flutter_solidart/flutter_solidart.dart';
+
+const _registryPageSize = 100;
+final RegExp _registryTagPattern = RegExp(
+  r'^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$',
+);
+
+String _roomRegistryRepositoryRef(String repository) =>
+    'room.meshagent.com/$repository';
+
+String _roomRegistryTagRef(String repository, String tag) =>
+    '${_roomRegistryRepositoryRef(repository)}:$tag';
+
+String _displayDigest(String? digest) {
+  if (digest == null || digest.isEmpty) {
+    return 'Unavailable';
+  }
+  return digest;
+}
+
+String _shortDigest(String? digest) {
+  if (digest == null || digest.isEmpty) {
+    return 'Unavailable';
+  }
+  if (digest.length <= 20) {
+    return digest;
+  }
+  return '${digest.substring(0, 20)}...';
+}
+
+Future<void> _copyRegistryValue(
+  BuildContext context, {
+  required String label,
+  required String value,
+}) async {
+  await Clipboard.setData(ClipboardData(text: value));
+  if (!context.mounted) {
+    return;
+  }
+  ShadToaster.of(context).show(ShadToast(description: Text('Copied $label')));
+}
 
 class TerminalLaunchOptions {
   const TerminalLaunchOptions({required this.command, this.mounts});
@@ -677,6 +718,642 @@ class _ImageTableState extends State<ImageTable> {
           ),
         );
       },
+    );
+  }
+}
+
+class RegistryTable extends StatefulWidget {
+  const RegistryTable({super.key, required this.client});
+
+  final RoomClient client;
+
+  @override
+  State<RegistryTable> createState() => _RegistryTableState();
+}
+
+class _RegistryTableState extends State<RegistryTable> {
+  late Future<List<String>> _repositoriesFuture;
+  late Timer _timer;
+
+  Future<List<String>> _loadRepositories() async {
+    final repositories = <String>[];
+    final seen = <String>{};
+    String? last;
+    while (true) {
+      final page = await widget.client.containers.listRegistryImages(
+        last: last,
+        n: _registryPageSize,
+      );
+      for (final repository in page.repositories) {
+        if (seen.add(repository)) {
+          repositories.add(repository);
+        }
+      }
+      if (page.nextLast == null || page.nextLast == last) {
+        break;
+      }
+      last = page.nextLast;
+    }
+    repositories.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return repositories;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _repositoriesFuture = _loadRepositories();
+    _timer = Timer.periodic(const Duration(seconds: 1), _onTick);
+  }
+
+  void _onTick(Timer timer) {
+    _loadRepositories().then((repositories) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _repositoriesFuture = SynchronousFuture(repositories);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  Future<void> _reload() async {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _repositoriesFuture = _loadRepositories();
+    });
+  }
+
+  Future<void> _openRepository(String repository) async {
+    await showShadDialog<void>(
+      context: context,
+      builder: (dialogContext) => RegistryTagDialog(
+        client: widget.client,
+        repository: repository,
+        onChanged: _reload,
+      ),
+    );
+    await _reload();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              ShadButton.ghost(
+                trailing: const Icon(LucideIcons.refreshCw),
+                onPressed: _reload,
+                child: const Text('Refresh Registry'),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: FutureBuilder<List<String>>(
+            future: _repositoriesFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
+
+              final repositories = snapshot.data!;
+              if (repositories.isEmpty) {
+                return const Center(child: Text('No registry images found'));
+              }
+
+              return LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  scrollDirection: Axis.vertical,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minWidth: constraints.maxWidth,
+                      ),
+                      child: DataTable(
+                        columns: const [
+                          DataColumn(label: Text('Repository')),
+                          DataColumn(label: Text('Registry Ref')),
+                          DataColumn(label: Text('')),
+                        ],
+                        rows: [
+                          for (final repository in repositories)
+                            DataRow(
+                              onSelectChanged: (_) =>
+                                  _openRepository(repository),
+                              cells: [
+                                DataCell(SelectableText(repository)),
+                                DataCell(
+                                  SizedBox(
+                                    width: 420,
+                                    child: SelectableText(
+                                      _roomRegistryRepositoryRef(repository),
+                                      maxLines: 1,
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.list_alt_outlined,
+                                        ),
+                                        tooltip: 'View tags',
+                                        onPressed: () =>
+                                            _openRepository(repository),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.copy_outlined),
+                                        tooltip: 'Copy image ref',
+                                        onPressed: () => _copyRegistryValue(
+                                          context,
+                                          label: 'registry ref',
+                                          value: _roomRegistryRepositoryRef(
+                                            repository,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class RegistryTagDialog extends StatefulWidget {
+  const RegistryTagDialog({
+    super.key,
+    required this.client,
+    required this.repository,
+    this.onChanged,
+  });
+
+  final RoomClient client;
+  final String repository;
+  final Future<void> Function()? onChanged;
+
+  @override
+  State<RegistryTagDialog> createState() => _RegistryTagDialogState();
+}
+
+class _RegistryTagDialogState extends State<RegistryTagDialog> {
+  late Future<List<RegistryTagVersion>> _versionsFuture;
+
+  Future<List<RegistryTagVersion>> _loadVersions() async {
+    final versions = <RegistryTagVersion>[];
+    final seen = <String>{};
+    String? last;
+    while (true) {
+      final page = await widget.client.containers.listRegistryTags(
+        image: _roomRegistryRepositoryRef(widget.repository),
+        last: last,
+        n: _registryPageSize,
+      );
+      for (final version in page.versions) {
+        if (seen.add(version.tag)) {
+          versions.add(version);
+        }
+      }
+      if (page.nextLast == null || page.nextLast == last) {
+        break;
+      }
+      last = page.nextLast;
+    }
+    versions.sort((a, b) => a.tag.toLowerCase().compareTo(b.tag.toLowerCase()));
+    return versions;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _versionsFuture = _loadVersions();
+  }
+
+  Future<void> _reload() async {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _versionsFuture = _loadVersions();
+    });
+  }
+
+  Future<void> _notifyParentChanged() async {
+    final onChanged = widget.onChanged;
+    if (onChanged != null) {
+      await onChanged();
+    }
+  }
+
+  Future<void> _editVersion(RegistryTagVersion version) async {
+    final result = await showShadDialog<_RegistryTagEditResult>(
+      context: context,
+      builder: (dialogContext) => _RegistryTagEditDialog(
+        repository: widget.repository,
+        version: version,
+      ),
+    );
+    if (result == null) {
+      return;
+    }
+
+    try {
+      final updated = await widget.client.containers.updateRegistryTag(
+        image: _roomRegistryTagRef(widget.repository, version.tag),
+        tag: result.tag,
+        deleteSource: !result.keepOriginal,
+      );
+      if (!mounted) {
+        return;
+      }
+      ShadToaster.of(context).show(
+        ShadToast(
+          description: Text(
+            updated.deletedSource
+                ? 'Renamed tag to ${updated.tag}'
+                : 'Created tag ${updated.tag}',
+          ),
+        ),
+      );
+      await _reload();
+      await _notifyParentChanged();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ShadToaster.of(
+        context,
+      ).show(ShadToast(description: Text('Unable to update tag: $error')));
+    }
+  }
+
+  Future<void> _deleteVersion(
+    List<RegistryTagVersion> versions,
+    RegistryTagVersion version,
+  ) async {
+    final versionDigest = version.digest;
+    final relatedTags = versions
+        .where(
+          (entry) =>
+              versionDigest != null &&
+              versionDigest.isNotEmpty &&
+              entry.digest == versionDigest &&
+              entry.tag != version.tag,
+        )
+        .map((entry) => entry.tag)
+        .toList(growable: false);
+
+    final confirm =
+        await showShadDialog<bool>(
+          context: context,
+          builder: (dialogContext) => ShadDialog(
+            title: const Text('Delete registry tag?'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_roomRegistryTagRef(widget.repository, version.tag)),
+                const SizedBox(height: 12),
+                Text('Digest: ${_displayDigest(version.digest)}'),
+                if (relatedTags.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'This deletes the manifest digest and will also remove: ${relatedTags.join(', ')}',
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              ShadButton.secondary(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              ShadButton.destructive(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirm) {
+      return;
+    }
+
+    try {
+      await widget.client.containers.deleteRegistryImage(
+        image: _roomRegistryTagRef(widget.repository, version.tag),
+      );
+      if (!mounted) {
+        return;
+      }
+      ShadToaster.of(
+        context,
+      ).show(const ShadToast(description: Text('Deleted registry tag')));
+      await _reload();
+      await _notifyParentChanged();
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ShadToaster.of(
+        context,
+      ).show(ShadToast(description: Text('Unable to delete tag: $error')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ShadDialog(
+      title: const Text('Registry Tags'),
+      description: Text(_roomRegistryRepositoryRef(widget.repository)),
+      constraints: const BoxConstraints(maxWidth: 1120, maxHeight: 720),
+      child: SizedBox(
+        width: 1120,
+        height: 640,
+        child: FutureBuilder<List<RegistryTagVersion>>(
+          future: _versionsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
+            }
+
+            final versions = snapshot.data!;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    ShadButton.ghost(
+                      trailing: const Icon(LucideIcons.refreshCw),
+                      onPressed: _reload,
+                      child: const Text('Refresh'),
+                    ),
+                    const SizedBox(width: 8),
+                    ShadButton.ghost(
+                      trailing: const Icon(Icons.copy_outlined),
+                      onPressed: () => _copyRegistryValue(
+                        context,
+                        label: 'repository ref',
+                        value: _roomRegistryRepositoryRef(widget.repository),
+                      ),
+                      child: const Text('Copy Repo Ref'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: versions.isEmpty
+                      ? const Center(child: Text('No tags found'))
+                      : LayoutBuilder(
+                          builder: (context, constraints) => SingleChildScrollView(
+                            scrollDirection: Axis.vertical,
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minWidth: constraints.maxWidth,
+                                ),
+                                child: DataTable(
+                                  columns: const [
+                                    DataColumn(label: Text('Tag')),
+                                    DataColumn(label: Text('Digest')),
+                                    DataColumn(label: Text('Image Ref')),
+                                    DataColumn(label: Text('')),
+                                  ],
+                                  rows: [
+                                    for (final version in versions)
+                                      DataRow(
+                                        cells: [
+                                          DataCell(SelectableText(version.tag)),
+                                          DataCell(
+                                            Tooltip(
+                                              message:
+                                                  version.digest ??
+                                                  'Digest unavailable on this room server',
+                                              child: SelectableText(
+                                                _shortDigest(version.digest),
+                                              ),
+                                            ),
+                                          ),
+                                          DataCell(
+                                            SizedBox(
+                                              width: 420,
+                                              child: SelectableText(
+                                                _roomRegistryTagRef(
+                                                  widget.repository,
+                                                  version.tag,
+                                                ),
+                                                maxLines: 1,
+                                              ),
+                                            ),
+                                          ),
+                                          DataCell(
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  icon: const Icon(
+                                                    Icons.edit_outlined,
+                                                  ),
+                                                  tooltip: 'Edit tag',
+                                                  onPressed: () =>
+                                                      _editVersion(version),
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(
+                                                    Icons.copy_outlined,
+                                                  ),
+                                                  tooltip: 'Copy image ref',
+                                                  onPressed: () =>
+                                                      _copyRegistryValue(
+                                                        context,
+                                                        label: 'tag ref',
+                                                        value:
+                                                            _roomRegistryTagRef(
+                                                              widget.repository,
+                                                              version.tag,
+                                                            ),
+                                                      ),
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(
+                                                    LucideIcons.delete,
+                                                  ),
+                                                  tooltip: 'Delete tag',
+                                                  onPressed: () =>
+                                                      _deleteVersion(
+                                                        versions,
+                                                        version,
+                                                      ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+      actions: [
+        ShadButton.secondary(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+}
+
+class _RegistryTagEditResult {
+  const _RegistryTagEditResult({required this.tag, required this.keepOriginal});
+
+  final String tag;
+  final bool keepOriginal;
+}
+
+class _RegistryTagEditDialog extends StatefulWidget {
+  const _RegistryTagEditDialog({
+    required this.repository,
+    required this.version,
+  });
+
+  final String repository;
+  final RegistryTagVersion version;
+
+  @override
+  State<_RegistryTagEditDialog> createState() => _RegistryTagEditDialogState();
+}
+
+class _RegistryTagEditDialogState extends State<_RegistryTagEditDialog> {
+  late final TextEditingController _tagController;
+  bool _keepOriginal = false;
+  String? _validationError;
+
+  @override
+  void initState() {
+    super.initState();
+    _tagController = TextEditingController(text: widget.version.tag);
+  }
+
+  @override
+  void dispose() {
+    _tagController.dispose();
+    super.dispose();
+  }
+
+  _RegistryTagEditResult? _buildResult() {
+    final tag = _tagController.text.trim();
+    if (!_registryTagPattern.hasMatch(tag)) {
+      _validationError = 'Enter a valid OCI tag.';
+      return null;
+    }
+    if (tag == widget.version.tag) {
+      _validationError = 'Enter a different tag.';
+      return null;
+    }
+    _validationError = null;
+    return _RegistryTagEditResult(tag: tag, keepOriginal: _keepOriginal);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ShadDialog(
+      title: const Text('Edit Registry Tag'),
+      description: Text(
+        _roomRegistryTagRef(widget.repository, widget.version.tag),
+      ),
+      constraints: const BoxConstraints(maxWidth: 560),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ShadInputFormField(
+            controller: _tagController,
+            label: const Text('New tag'),
+            description: const Text(
+              'Rename the existing tag or keep it and create an alias.',
+            ),
+          ),
+          const SizedBox(height: 12),
+          ShadCheckboxFormField(
+            initialValue: _keepOriginal,
+            onChanged: (value) {
+              setState(() {
+                _keepOriginal = value;
+              });
+            },
+            inputLabel: const Text('Keep original tag'),
+          ),
+          const SizedBox(height: 12),
+          SelectableText('Digest: ${_displayDigest(widget.version.digest)}'),
+          if (_validationError != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _validationError!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        ShadButton.secondary(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ShadButton(
+          onPressed: () {
+            final result = _buildResult();
+            if (result == null) {
+              setState(() {});
+              return;
+            }
+            Navigator.of(context).pop(result);
+          },
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }
