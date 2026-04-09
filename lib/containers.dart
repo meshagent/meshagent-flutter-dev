@@ -22,6 +22,35 @@ String _roomRegistryRepositoryRef(String repository) =>
 String _roomRegistryTagRef(String repository, String tag) =>
     '${_roomRegistryRepositoryRef(repository)}:$tag';
 
+String _roomRegistryDigestRef(String repository, String digest) =>
+    '${_roomRegistryRepositoryRef(repository)}@$digest';
+
+String _displayRegistryTag(String? tag) {
+  if (tag == null || tag.isEmpty) {
+    return 'untagged';
+  }
+  return tag;
+}
+
+String _registryReferenceKey(RegistryReference reference) {
+  final tag = reference.tag;
+  if (tag != null && tag.isNotEmpty) {
+    return '0:${tag.toLowerCase()}:$tag:${reference.digest}';
+  }
+  return '1:${reference.digest}';
+}
+
+String _roomRegistryReferenceRef(
+  String repository,
+  RegistryReference reference,
+) {
+  final tag = reference.tag;
+  if (tag != null && tag.isNotEmpty) {
+    return _roomRegistryTagRef(repository, tag);
+  }
+  return _roomRegistryDigestRef(repository, reference.digest);
+}
+
 String _displayDigest(String? digest) {
   if (digest == null || digest.isEmpty) {
     return 'Unavailable';
@@ -875,7 +904,7 @@ class _RegistryTableState extends State<RegistryTable> {
                                         icon: const Icon(
                                           Icons.list_alt_outlined,
                                         ),
-                                        tooltip: 'View tags',
+                                        tooltip: 'View refs',
                                         onPressed: () =>
                                             _openRepository(repository),
                                       ),
@@ -926,21 +955,21 @@ class RegistryTagDialog extends StatefulWidget {
 }
 
 class _RegistryTagDialogState extends State<RegistryTagDialog> {
-  late Future<List<RegistryTagVersion>> _versionsFuture;
+  late Future<List<RegistryReference>> _referencesFuture;
 
-  Future<List<RegistryTagVersion>> _loadVersions() async {
-    final versions = <RegistryTagVersion>[];
+  Future<List<RegistryReference>> _loadReferences() async {
+    final references = <RegistryReference>[];
     final seen = <String>{};
     String? last;
     while (true) {
-      final page = await widget.client.containers.listRegistryTags(
+      final page = await widget.client.containers.listRegistryReferences(
         image: _roomRegistryRepositoryRef(widget.repository),
         last: last,
         n: _registryPageSize,
       );
-      for (final version in page.versions) {
-        if (seen.add(version.tag)) {
-          versions.add(version);
+      for (final reference in page.references) {
+        if (seen.add(_registryReferenceKey(reference))) {
+          references.add(reference);
         }
       }
       if (page.nextLast == null || page.nextLast == last) {
@@ -948,14 +977,16 @@ class _RegistryTagDialogState extends State<RegistryTagDialog> {
       }
       last = page.nextLast;
     }
-    versions.sort((a, b) => a.tag.toLowerCase().compareTo(b.tag.toLowerCase()));
-    return versions;
+    references.sort(
+      (a, b) => _registryReferenceKey(a).compareTo(_registryReferenceKey(b)),
+    );
+    return references;
   }
 
   @override
   void initState() {
     super.initState();
-    _versionsFuture = _loadVersions();
+    _referencesFuture = _loadReferences();
   }
 
   Future<void> _reload() async {
@@ -963,7 +994,7 @@ class _RegistryTagDialogState extends State<RegistryTagDialog> {
       return;
     }
     setState(() {
-      _versionsFuture = _loadVersions();
+      _referencesFuture = _loadReferences();
     });
   }
 
@@ -974,7 +1005,7 @@ class _RegistryTagDialogState extends State<RegistryTagDialog> {
     }
   }
 
-  Future<void> _editVersion(RegistryTagVersion version) async {
+  Future<void> _editVersion(RegistryReference version) async {
     final result = await showShadDialog<_RegistryTagEditResult>(
       context: context,
       builder: (dialogContext) => _RegistryTagEditDialog(
@@ -988,9 +1019,9 @@ class _RegistryTagDialogState extends State<RegistryTagDialog> {
 
     try {
       final updated = await widget.client.containers.updateRegistryTag(
-        image: _roomRegistryTagRef(widget.repository, version.tag),
+        image: _roomRegistryReferenceRef(widget.repository, version),
         tag: result.tag,
-        deleteSource: !result.keepOriginal,
+        deleteSource: version.tag != null && !result.keepOriginal,
       );
       if (!mounted) {
         return;
@@ -998,7 +1029,7 @@ class _RegistryTagDialogState extends State<RegistryTagDialog> {
       ShadToaster.of(context).show(
         ShadToast(
           description: Text(
-            updated.deletedSource
+            updated.deletedSource && version.tag != null
                 ? 'Renamed tag to ${updated.tag}'
                 : 'Created tag ${updated.tag}',
           ),
@@ -1010,38 +1041,41 @@ class _RegistryTagDialogState extends State<RegistryTagDialog> {
       if (!mounted) {
         return;
       }
-      ShadToaster.of(
-        context,
-      ).show(ShadToast(description: Text('Unable to update tag: $error')));
+      ShadToaster.of(context).show(
+        ShadToast(description: Text('Unable to update reference: $error')),
+      );
     }
   }
 
   Future<void> _deleteVersion(
-    List<RegistryTagVersion> versions,
-    RegistryTagVersion version,
+    List<RegistryReference> versions,
+    RegistryReference version,
   ) async {
     final versionDigest = version.digest;
     final relatedTags = versions
         .where(
           (entry) =>
-              versionDigest != null &&
-              versionDigest.isNotEmpty &&
               entry.digest == versionDigest &&
+              entry.tag != null &&
               entry.tag != version.tag,
         )
-        .map((entry) => entry.tag)
+        .map((entry) => entry.tag!)
         .toList(growable: false);
 
     final confirm =
         await showShadDialog<bool>(
           context: context,
           builder: (dialogContext) => ShadDialog(
-            title: const Text('Delete registry tag?'),
+            title: Text(
+              version.tag == null
+                  ? 'Delete registry digest?'
+                  : 'Delete registry tag?',
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(_roomRegistryTagRef(widget.repository, version.tag)),
+                Text(_roomRegistryReferenceRef(widget.repository, version)),
                 const SizedBox(height: 12),
                 Text('Digest: ${_displayDigest(version.digest)}'),
                 if (relatedTags.isNotEmpty) ...[
@@ -1071,37 +1105,39 @@ class _RegistryTagDialogState extends State<RegistryTagDialog> {
 
     try {
       await widget.client.containers.deleteRegistryImage(
-        image: _roomRegistryTagRef(widget.repository, version.tag),
+        image: _roomRegistryReferenceRef(widget.repository, version),
       );
       if (!mounted) {
         return;
       }
       ShadToaster.of(
         context,
-      ).show(const ShadToast(description: Text('Deleted registry tag')));
+      ).show(const ShadToast(description: Text('Deleted registry reference')));
       await _reload();
       await _notifyParentChanged();
     } catch (error) {
       if (!mounted) {
         return;
       }
-      ShadToaster.of(
-        context,
-      ).show(ShadToast(description: Text('Unable to delete tag: $error')));
+      ShadToaster.of(context).show(
+        ShadToast(
+          description: Text('Unable to delete registry reference: $error'),
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return ShadDialog(
-      title: const Text('Registry Tags'),
+      title: const Text('Registry References'),
       description: Text(_roomRegistryRepositoryRef(widget.repository)),
       constraints: const BoxConstraints(maxWidth: 1120, maxHeight: 720),
       child: SizedBox(
         width: 1120,
         height: 640,
-        child: FutureBuilder<List<RegistryTagVersion>>(
-          future: _versionsFuture,
+        child: FutureBuilder<List<RegistryReference>>(
+          future: _referencesFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -1110,7 +1146,7 @@ class _RegistryTagDialogState extends State<RegistryTagDialog> {
               return Center(child: Text('Error: ${snapshot.error}'));
             }
 
-            final versions = snapshot.data!;
+            final references = snapshot.data!;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -1135,8 +1171,10 @@ class _RegistryTagDialogState extends State<RegistryTagDialog> {
                 ),
                 const SizedBox(height: 16),
                 Expanded(
-                  child: versions.isEmpty
-                      ? const Center(child: Text('No tags found'))
+                  child: references.isEmpty
+                      ? const Center(
+                          child: Text('No registry references found'),
+                        )
                       : LayoutBuilder(
                           builder: (context, constraints) => SingleChildScrollView(
                             scrollDirection: Axis.vertical,
@@ -1154,15 +1192,17 @@ class _RegistryTagDialogState extends State<RegistryTagDialog> {
                                     DataColumn(label: Text('')),
                                   ],
                                   rows: [
-                                    for (final version in versions)
+                                    for (final version in references)
                                       DataRow(
                                         cells: [
-                                          DataCell(SelectableText(version.tag)),
+                                          DataCell(
+                                            SelectableText(
+                                              _displayRegistryTag(version.tag),
+                                            ),
+                                          ),
                                           DataCell(
                                             Tooltip(
-                                              message:
-                                                  version.digest ??
-                                                  'Digest unavailable on this room server',
+                                              message: version.digest,
                                               child: SelectableText(
                                                 _shortDigest(version.digest),
                                               ),
@@ -1172,9 +1212,9 @@ class _RegistryTagDialogState extends State<RegistryTagDialog> {
                                             SizedBox(
                                               width: 420,
                                               child: SelectableText(
-                                                _roomRegistryTagRef(
+                                                _roomRegistryReferenceRef(
                                                   widget.repository,
-                                                  version.tag,
+                                                  version,
                                                 ),
                                                 maxLines: 1,
                                               ),
@@ -1188,7 +1228,9 @@ class _RegistryTagDialogState extends State<RegistryTagDialog> {
                                                   icon: const Icon(
                                                     Icons.edit_outlined,
                                                   ),
-                                                  tooltip: 'Edit tag',
+                                                  tooltip: version.tag == null
+                                                      ? 'Create tag'
+                                                      : 'Edit tag',
                                                   onPressed: () =>
                                                       _editVersion(version),
                                                 ),
@@ -1200,11 +1242,14 @@ class _RegistryTagDialogState extends State<RegistryTagDialog> {
                                                   onPressed: () =>
                                                       _copyRegistryValue(
                                                         context,
-                                                        label: 'tag ref',
+                                                        label:
+                                                            version.tag == null
+                                                            ? 'digest ref'
+                                                            : 'tag ref',
                                                         value:
-                                                            _roomRegistryTagRef(
+                                                            _roomRegistryReferenceRef(
                                                               widget.repository,
-                                                              version.tag,
+                                                              version,
                                                             ),
                                                       ),
                                                 ),
@@ -1212,10 +1257,10 @@ class _RegistryTagDialogState extends State<RegistryTagDialog> {
                                                   icon: const Icon(
                                                     LucideIcons.delete,
                                                   ),
-                                                  tooltip: 'Delete tag',
+                                                  tooltip: 'Delete reference',
                                                   onPressed: () =>
                                                       _deleteVersion(
-                                                        versions,
+                                                        references,
                                                         version,
                                                       ),
                                                 ),
@@ -1260,7 +1305,7 @@ class _RegistryTagEditDialog extends StatefulWidget {
   });
 
   final String repository;
-  final RegistryTagVersion version;
+  final RegistryReference version;
 
   @override
   State<_RegistryTagEditDialog> createState() => _RegistryTagEditDialogState();
@@ -1274,7 +1319,7 @@ class _RegistryTagEditDialogState extends State<_RegistryTagEditDialog> {
   @override
   void initState() {
     super.initState();
-    _tagController = TextEditingController(text: widget.version.tag);
+    _tagController = TextEditingController(text: widget.version.tag ?? '');
   }
 
   @override
@@ -1289,7 +1334,7 @@ class _RegistryTagEditDialogState extends State<_RegistryTagEditDialog> {
       _validationError = 'Enter a valid OCI tag.';
       return null;
     }
-    if (tag == widget.version.tag) {
+    if (widget.version.tag != null && tag == widget.version.tag) {
       _validationError = 'Enter a different tag.';
       return null;
     }
@@ -1299,10 +1344,11 @@ class _RegistryTagEditDialogState extends State<_RegistryTagEditDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final hasTag = widget.version.tag != null;
     return ShadDialog(
-      title: const Text('Edit Registry Tag'),
+      title: Text(hasTag ? 'Edit Registry Tag' : 'Create Registry Tag'),
       description: Text(
-        _roomRegistryTagRef(widget.repository, widget.version.tag),
+        _roomRegistryReferenceRef(widget.repository, widget.version),
       ),
       constraints: const BoxConstraints(maxWidth: 560),
       child: Column(
@@ -1312,20 +1358,24 @@ class _RegistryTagEditDialogState extends State<_RegistryTagEditDialog> {
           ShadInputFormField(
             controller: _tagController,
             label: const Text('New tag'),
-            description: const Text(
-              'Rename the existing tag or keep it and create an alias.',
+            description: Text(
+              hasTag
+                  ? 'Rename the existing tag or keep it and create an alias.'
+                  : 'Create a new tag that points at this digest.',
             ),
           ),
-          const SizedBox(height: 12),
-          ShadCheckboxFormField(
-            initialValue: _keepOriginal,
-            onChanged: (value) {
-              setState(() {
-                _keepOriginal = value;
-              });
-            },
-            inputLabel: const Text('Keep original tag'),
-          ),
+          if (hasTag) ...[
+            const SizedBox(height: 12),
+            ShadCheckboxFormField(
+              initialValue: _keepOriginal,
+              onChanged: (value) {
+                setState(() {
+                  _keepOriginal = value;
+                });
+              },
+              inputLabel: const Text('Keep original tag'),
+            ),
+          ],
           const SizedBox(height: 12),
           SelectableText('Digest: ${_displayDigest(widget.version.digest)}'),
           if (_validationError != null) ...[
