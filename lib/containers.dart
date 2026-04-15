@@ -2357,6 +2357,8 @@ class ConfigureServiceTemplate extends StatefulWidget {
     this.routeDomains = const [],
     this.customActions = const [],
     this.header = const [],
+    this.showActionRow = true,
+    this.onFormStateChanged,
   });
 
   final ServiceTemplateSpec spec;
@@ -2364,6 +2366,9 @@ class ConfigureServiceTemplate extends StatefulWidget {
   final List<String> routeDomains;
   final List<Widget> customActions;
   final List<Widget> header;
+  final bool showActionRow;
+  final void Function(Map<String, String> vars, bool Function() validate)?
+  onFormStateChanged;
 
   final List<Widget> Function(
     BuildContext,
@@ -2494,228 +2499,233 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
     final mailDomain = const String.fromEnvironment("MESHAGENT_MAIL_DOMAIN");
     final emailSuffix = mailDomain.isEmpty ? "" : "@$mailDomain";
     final routeDomains = _routeDomains;
+    final actions = widget.actionsBuilder(context, _vars, _validate);
+    widget.onFormStateChanged?.call(
+      Map<String, String>.unmodifiable(_vars),
+      _validate,
+    );
+    final formFields = [
+      ...widget.header,
+      if (widget.spec.variables?.isNotEmpty ?? false) ...[
+        for (final v in widget.spec.variables ?? <ServiceTemplateVariable>[])
+          switch (v.type) {
+            "email" => Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ShadInputFormField(
+                  id: v.name,
+                  constraints: BoxConstraints(maxWidth: 400),
+                  padding: EdgeInsets.only(
+                    left: 8,
+                    top: 0,
+                    bottom: 0,
+                    right: 0,
+                  ),
+                  label: Text(
+                    '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
+                    style: labelStyle,
+                  ),
+                  obscureText: v.obscure,
+                  initialValue: emailSuffix.isEmpty
+                      ? (_vars[v.name] ?? '')
+                      : (_vars[v.name] ?? '').replaceAll(emailSuffix, ''),
+                  onChanged: (txt) => setState(() {
+                    final normalized = txt.trim();
+                    if (normalized.isEmpty) {
+                      _vars[v.name] = "";
+                    } else if (emailSuffix.isEmpty) {
+                      _vars[v.name] = normalized;
+                    } else {
+                      _vars[v.name] = "$normalized$emailSuffix";
+                    }
+                  }),
+                  trailing: emailSuffix.isEmpty
+                      ? null
+                      : Container(
+                          color: ShadTheme.of(context).colorScheme.muted,
+                          padding: EdgeInsets.all(8),
+                          child: Text(emailSuffix),
+                        ),
+                ),
+                if (v.description != null)
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: 7),
+                    child: Text(v.description ?? ''),
+                  ),
+              ],
+            ),
+            "route" => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (routeDomains.isEmpty)
+                  ShadInputFormField(
+                    id: "${v.name}_domain",
+                    label: Text(
+                      '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
+                      style: labelStyle,
+                    ),
+                    initialValue: _vars[v.name] ?? "",
+                    description: v.description == null
+                        ? null
+                        : Text(v.description ?? ''),
+                    validator: v.optional
+                        ? null
+                        : (txt) => (txt.trim().isEmpty)
+                              ? '${_variableTitle(v)} is required'
+                              : null,
+                    onChanged: (txt) =>
+                        setState(() => _vars[v.name] = txt.trim()),
+                  )
+                else ...[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      ShadInputFormField(
+                        constraints: BoxConstraints(maxWidth: 300),
+                        padding: EdgeInsets.only(left: 8),
+                        gap: 0,
+                        id: "${v.name}_subdomain",
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        label: Text(
+                          '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
+                          style: labelStyle,
+                        ),
+                        initialValue: _routeSubdomains[v.name] ?? "",
+                        validator: v.optional
+                            ? null
+                            : (txt) => (txt.trim().isEmpty)
+                                  ? '${_variableTitle(v)} is required'
+                                  : null,
+                        onChanged: (txt) {
+                          setState(() {
+                            _routeSubdomains[v.name] = txt.trim();
+                            _syncRouteValue(v.name);
+                          });
+                        },
+                        trailing: Container(
+                          color: ShadTheme.of(context).colorScheme.muted,
+                          padding: EdgeInsets.all(8),
+                          child: Text(".${routeDomains.first}"),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (v.description != null)
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: 7),
+                      child: Text(v.description ?? ''),
+                    ),
+                ],
+              ],
+            ),
+            _ =>
+              v.enumValues == null
+                  ? ShadInputFormField(
+                      id: v.name,
+                      label: Text(
+                        '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
+                        style: labelStyle,
+                      ),
+                      obscureText: v.obscure,
+                      initialValue: _vars[v.name] ?? '',
+                      description: v.description == null
+                          ? null
+                          : Text(v.description ?? ''),
+                      validator: (txt) {
+                        final val = txt.trim();
+                        if (v.optional) return null;
+                        final msg = val.isEmpty
+                            ? '${_variableTitle(v)} is required'
+                            : null;
+                        return msg;
+                      },
+                      onChanged: (txt) =>
+                          setState(() => _vars[v.name] = txt.trim()),
+                    )
+                  : ShadSelectFormField<String>(
+                      label: Text(_variableTitle(v), style: labelStyle),
+                      id: v.name,
+                      initialValue: v.enumValues!.contains(_vars[v.name])
+                          ? _vars[v.name]
+                          : v.enumValues!.first,
+                      selectedOptionBuilder: (context, value) => Text(value),
+                      options: [
+                        ...v.enumValues!.map(
+                          (val) =>
+                              ShadOption<String>(value: val, child: Text(val)),
+                        ),
+                      ],
+                      description: v.description == null
+                          ? null
+                          : Text(v.description ?? ''),
+                      validator: v.optional
+                          ? null
+                          : (txt) {
+                              final msg =
+                                  (txt?.trim().isEmpty == true || txt == null)
+                                  ? '${_variableTitle(v)} is required'
+                                  : null;
+                              return msg;
+                            },
+                      onChanged: (txt) => setState(() => _vars[v.name] = txt!),
+                    ),
+          },
+      ],
+      if (widget.spec.container != null) ...[
+        if (widget.spec.container!.storage != null &&
+            widget.spec.container!.storage?.room != null) ...[
+          for (final rs in widget.spec.container!.storage!.room!) ...[
+            Text(
+              rs.subpath == null
+                  ? "Mounts entire room's storage to"
+                  : "Mounts only ${rs.subpath} to",
+              style: labelStyle,
+            ),
+            Text(rs.path),
+          ],
+        ],
+      ],
+    ].map((x) => Container(margin: EdgeInsets.only(bottom: 10), child: x)).toList();
 
     return ShadForm(
       key: _formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 16,
-        children: [
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              children: [
-                ...widget.header,
-                if (widget.spec.variables?.isNotEmpty ?? false) ...[
-                  for (final v
-                      in widget.spec.variables ?? <ServiceTemplateVariable>[])
-                    switch (v.type) {
-                      "email" => Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ShadInputFormField(
-                            id: v.name,
-                            constraints: BoxConstraints(maxWidth: 400),
-                            padding: EdgeInsets.only(
-                              left: 8,
-                              top: 0,
-                              bottom: 0,
-                              right: 0,
-                            ),
-                            label: Text(
-                              '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
-                              style: labelStyle,
-                            ),
-                            obscureText: v.obscure,
-                            initialValue: emailSuffix.isEmpty
-                                ? (_vars[v.name] ?? '')
-                                : (_vars[v.name] ?? '').replaceAll(
-                                    emailSuffix,
-                                    '',
-                                  ),
-                            onChanged: (txt) => setState(() {
-                              final normalized = txt.trim();
-                              if (normalized.isEmpty) {
-                                _vars[v.name] = "";
-                              } else if (emailSuffix.isEmpty) {
-                                _vars[v.name] = normalized;
-                              } else {
-                                _vars[v.name] = "$normalized$emailSuffix";
-                              }
-                            }),
-                            trailing: emailSuffix.isEmpty
-                                ? null
-                                : Container(
-                                    color: ShadTheme.of(
-                                      context,
-                                    ).colorScheme.muted,
-                                    padding: EdgeInsets.all(8),
-                                    child: Text(emailSuffix),
-                                  ),
-                          ),
-                          if (v.description != null)
-                            Padding(
-                              padding: EdgeInsets.symmetric(vertical: 7),
-                              child: Text(v.description ?? ''),
-                            ),
-                        ],
-                      ),
-                      "route" => Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (routeDomains.isEmpty)
-                            ShadInputFormField(
-                              id: "${v.name}_domain",
-                              label: Text(
-                                '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
-                                style: labelStyle,
-                              ),
-                              initialValue: _vars[v.name] ?? "",
-                              description: v.description == null
-                                  ? null
-                                  : Text(v.description ?? ''),
-                              validator: v.optional
-                                  ? null
-                                  : (txt) => (txt.trim().isEmpty)
-                                        ? '${_variableTitle(v)} is required'
-                                        : null,
-                              onChanged: (txt) =>
-                                  setState(() => _vars[v.name] = txt.trim()),
-                            )
-                          else ...[
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                ShadInputFormField(
-                                  constraints: BoxConstraints(maxWidth: 300),
-                                  padding: EdgeInsets.only(left: 8),
-                                  gap: 0,
-                                  id: "${v.name}_subdomain",
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  label: Text(
-                                    '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
-                                    style: labelStyle,
-                                  ),
-                                  initialValue: _routeSubdomains[v.name] ?? "",
-                                  validator: v.optional
-                                      ? null
-                                      : (txt) => (txt.trim().isEmpty)
-                                            ? '${_variableTitle(v)} is required'
-                                            : null,
-                                  onChanged: (txt) {
-                                    setState(() {
-                                      _routeSubdomains[v.name] = txt.trim();
-                                      _syncRouteValue(v.name);
-                                    });
-                                  },
-                                  trailing: Container(
-                                    color: ShadTheme.of(
-                                      context,
-                                    ).colorScheme.muted,
-                                    padding: EdgeInsets.all(8),
-                                    child: Text(".${routeDomains.first}"),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (v.description != null)
-                              Padding(
-                                padding: EdgeInsets.symmetric(vertical: 7),
-                                child: Text(v.description ?? ''),
-                              ),
-                          ],
-                        ],
-                      ),
-                      _ =>
-                        v.enumValues == null
-                            ? ShadInputFormField(
-                                id: v.name,
-                                label: Text(
-                                  '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
-                                  style: labelStyle,
-                                ),
-                                obscureText: v.obscure,
-                                initialValue: _vars[v.name] ?? '',
-                                description: v.description == null
-                                    ? null
-                                    : Text(v.description ?? ''),
-                                validator: (txt) {
-                                  final val = txt.trim();
-                                  if (v.optional) return null;
-                                  final msg = val.isEmpty
-                                      ? '${_variableTitle(v)} is required'
-                                      : null;
-                                  return msg;
-                                },
-                                onChanged: (txt) =>
-                                    setState(() => _vars[v.name] = txt.trim()),
-                              )
-                            : ShadSelectFormField<String>(
-                                label: Text(
-                                  _variableTitle(v),
-                                  style: labelStyle,
-                                ),
-                                id: v.name,
-                                initialValue:
-                                    v.enumValues!.contains(_vars[v.name])
-                                    ? _vars[v.name]
-                                    : v.enumValues!.first,
-                                selectedOptionBuilder: (context, value) =>
-                                    Text(value),
-                                options: [
-                                  ...v.enumValues!.map(
-                                    (val) => ShadOption<String>(
-                                      value: val,
-                                      child: Text(val),
-                                    ),
-                                  ),
-                                ],
-                                description: v.description == null
-                                    ? null
-                                    : Text(v.description ?? ''),
-                                validator: v.optional
-                                    ? null
-                                    : (txt) {
-                                        final msg =
-                                            (txt?.trim().isEmpty == true ||
-                                                txt == null)
-                                            ? '${_variableTitle(v)} is required'
-                                            : null;
-                                        return msg;
-                                      },
-                                onChanged: (txt) =>
-                                    setState(() => _vars[v.name] = txt!),
-                              ),
-                    },
-                ],
-                if (widget.spec.container != null) ...[
-                  if (widget.spec.container!.storage != null &&
-                      widget.spec.container!.storage?.room != null) ...[
-                    for (final rs in widget.spec.container!.storage!.room!) ...[
-                      Text(
-                        rs.subpath == null
-                            ? "Mounts entire room's storage to"
-                            : "Mounts only ${rs.subpath} to",
-                        style: labelStyle,
-                      ),
-                      Text(rs.path),
-                    ],
-                  ],
-                ],
-              ].map((x) => Container(margin: EdgeInsets.only(bottom: 10), child: x)).toList(),
-            ),
-          ),
-          Row(
-            spacing: 8,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final hasBoundedHeight = constraints.maxHeight.isFinite;
+
+          return Column(
+            mainAxisSize: hasBoundedHeight
+                ? MainAxisSize.max
+                : MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: 16,
             children: [
-              ...widget.customActions,
-              Spacer(),
-              ...widget.actionsBuilder(context, _vars, _validate),
+              if (hasBoundedHeight)
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    children: formFields,
+                  ),
+                )
+              else
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: formFields,
+                  ),
+                ),
+              if (widget.showActionRow)
+                Row(
+                  spacing: 8,
+                  children: [...widget.customActions, Spacer(), ...actions],
+                ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
