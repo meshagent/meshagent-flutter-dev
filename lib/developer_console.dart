@@ -5,11 +5,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:meshagent/meshagent.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
-import 'package:stream_transform/stream_transform.dart';
 
 import 'containers.dart';
 import 'terminal.dart';
 import 'trace_viewer.dart';
+
+class RoomDeveloperLogsScope extends InheritedNotifier<ValueNotifier<int>> {
+  const RoomDeveloperLogsScope({
+    super.key,
+    required this.events,
+    required ValueNotifier<int> version,
+    required super.child,
+  }) : super(notifier: version);
+
+  final List<RoomEvent> events;
+
+  ValueNotifier<int> get version => notifier!;
+
+  static RoomDeveloperLogsScope? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<RoomDeveloperLogsScope>();
+  }
+}
 
 class RoomDeveloperLogsListener extends StatefulWidget {
   const RoomDeveloperLogsListener({
@@ -29,6 +45,7 @@ class RoomDeveloperLogsListener extends StatefulWidget {
 
 class _RoomDeveloperLogsListenerState extends State<RoomDeveloperLogsListener> {
   late final events = widget.events;
+  late final ValueNotifier<int> _eventVersion = ValueNotifier<int>(0);
   late StreamSubscription<RoomLogEvent> sub;
 
   void _handleLogError(Object error, StackTrace stackTrace) {
@@ -56,17 +73,24 @@ class _RoomDeveloperLogsListenerState extends State<RoomDeveloperLogsListener> {
     if (!mounted) return;
 
     events.add(event);
+    _eventVersion.value++;
   }
 
   @override
   void dispose() {
-    super.dispose();
-
     sub.cancel();
+    _eventVersion.dispose();
+    super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => widget.child;
+  Widget build(BuildContext context) {
+    return RoomDeveloperLogsScope(
+      events: events,
+      version: _eventVersion,
+      child: widget.child,
+    );
+  }
 }
 
 enum DeveloperConsoleView {
@@ -108,22 +132,27 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
 
   ExecSession? selectedRun;
   final List<ExecSession> runs = [];
+  final ValueNotifier<int> _localDeveloperLogVersion = ValueNotifier<int>(0);
   StreamSubscription<RoomLogEvent>? developerLogsSubscription;
+  RoomClient? _developerLogsRoom;
 
   @override
   void initState() {
     super.initState();
+  }
 
-    _subscribeToDeveloperLogs();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncDeveloperLogsSource();
   }
 
   @override
   void didUpdateWidget(covariant RoomDeveloperConsole oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.room != widget.room) {
-      developerLogsSubscription?.cancel();
-      developerLogsSubscription = null;
-      _subscribeToDeveloperLogs();
+    if (oldWidget.room != widget.room ||
+        !identical(oldWidget.events, widget.events)) {
+      _syncDeveloperLogsSource();
     }
   }
 
@@ -138,19 +167,48 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
     );
   }
 
-  void _subscribeToDeveloperLogs() {
+  RoomDeveloperLogsScope? _developerLogsScope() {
+    final scope = RoomDeveloperLogsScope.maybeOf(context);
+    if (scope == null || !identical(scope.events, widget.events)) {
+      return null;
+    }
+    return scope;
+  }
+
+  void _cancelDeveloperLogsSubscription() {
+    developerLogsSubscription?.cancel();
+    developerLogsSubscription = null;
+    _developerLogsRoom = null;
+  }
+
+  void _syncDeveloperLogsSource() {
+    final scope = _developerLogsScope();
+    if (scope != null) {
+      _cancelDeveloperLogsSubscription();
+      return;
+    }
+
+    if (developerLogsSubscription != null &&
+        identical(_developerLogsRoom, widget.room)) {
+      return;
+    }
+
+    _cancelDeveloperLogsSubscription();
+    _developerLogsRoom = widget.room;
     developerLogsSubscription = widget.room.developer.logs().listen((event) {
-      if (!mounted) return;
-      setState(() {
-        widget.events.add(event);
-      });
+      widget.events.add(event);
+      _localDeveloperLogVersion.value++;
     }, onError: _handleDeveloperLogError);
+  }
+
+  Listenable _developerLogsListenable() {
+    return _developerLogsScope()?.version ?? _localDeveloperLogVersion;
   }
 
   @override
   void dispose() {
-    developerLogsSubscription?.cancel();
-
+    _cancelDeveloperLogsSubscription();
+    _localDeveloperLogVersion.dispose();
     super.dispose();
   }
 
@@ -363,6 +421,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
     final cs = theme.colorScheme;
+    final developerLogsListenable = _developerLogsListenable();
 
     return ColoredBox(
       color: cs.card,
@@ -504,25 +563,27 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
             ),
           Expanded(
             child: switch (view) {
-              DeveloperConsoleView.traces => LiveTraceViewer(
-                events: Stream.fromIterable(
-                  widget.events,
-                ).followedBy(widget.room.events),
-                searchQuery: traceFilter,
-              ),
-              DeveloperConsoleView.logs => LiveLogViewer(
-                events: Stream.fromIterable(
-                  widget.events,
-                ).followedBy(widget.room.events),
-                searchQuery: logFilter,
-                levelFilter: logLevelFilter,
-                clearSignal: logClearSignal,
-              ),
-              DeveloperConsoleView.metrics => LiveMetricsViewer(
-                pricing: widget.pricing,
-                events: Stream.fromIterable(
-                  widget.events,
-                ).followedBy(widget.room.events),
+              DeveloperConsoleView.traces ||
+              DeveloperConsoleView.logs ||
+              DeveloperConsoleView.metrics => ListenableBuilder(
+                listenable: developerLogsListenable,
+                builder: (context, child) => switch (view) {
+                  DeveloperConsoleView.traces => LiveTraceViewer(
+                    events: widget.events,
+                    searchQuery: traceFilter,
+                  ),
+                  DeveloperConsoleView.logs => LiveLogViewer(
+                    events: widget.events,
+                    searchQuery: logFilter,
+                    levelFilter: logLevelFilter,
+                    clearSignal: logClearSignal,
+                  ),
+                  DeveloperConsoleView.metrics => LiveMetricsViewer(
+                    pricing: widget.pricing,
+                    events: widget.events,
+                  ),
+                  _ => SizedBox.shrink(),
+                },
               ),
               DeveloperConsoleView.terminal => terminalView(context),
               DeveloperConsoleView.images => Column(

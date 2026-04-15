@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 import 'dart:convert';
 
@@ -131,6 +130,13 @@ class SpanCollection extends Iterable<Span> {
 
   Iterable<Span> getChildren(String parentSpanId) {
     return _childSpans[parentSpanId] ?? [];
+  }
+
+  void clear() {
+    _spans.clear();
+    _rootSpans.clear();
+    _childSpans.clear();
+    _spansById.clear();
   }
 
   @override
@@ -580,7 +586,7 @@ class LiveLogViewer extends StatefulWidget {
     this.clearSignal = 0,
   });
 
-  final Stream<RoomEvent> events;
+  final List<RoomEvent> events;
   final String searchQuery;
   final LogLevelFilter levelFilter;
   final int clearSignal;
@@ -590,24 +596,33 @@ class LiveLogViewer extends StatefulWidget {
 }
 
 class _LiveLogViewer extends State<LiveLogViewer> {
+  final List<LogRecord> logs = [];
+  final scrollController = ScrollController();
+  int _processedEventCount = 0;
+
   @override
   void initState() {
     super.initState();
-
-    sub = widget.events.listen(onEvent);
+    _rebuildLogs();
   }
-
-  StreamSubscription? sub;
-
-  final List<LogRecord> logs = [];
 
   @override
   void didUpdateWidget(covariant LiveLogViewer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.clearSignal != oldWidget.clearSignal) {
-      setState(() {
-        logs.clear();
-      });
+    final shouldReset =
+        widget.clearSignal != oldWidget.clearSignal ||
+        !identical(widget.events, oldWidget.events) ||
+        widget.events.length < _processedEventCount;
+    if (shouldReset) {
+      setState(_rebuildLogs);
+      return;
+    }
+
+    if (widget.events.length > _processedEventCount) {
+      final dirty = _processPendingEvents(autoScroll: true);
+      if (dirty) {
+        setState(() {});
+      }
     }
   }
 
@@ -679,41 +694,66 @@ class _LiveLogViewer extends State<LiveLogViewer> {
     return TextSpan(style: baseStyle, children: children);
   }
 
-  void onEvent(RoomEvent event) {
-    if (event is RoomLogEvent && event.name == "otel.log") {
-      var dirty = false;
+  void _rebuildLogs() {
+    logs.clear();
+    _processedEventCount = 0;
+    _processPendingEvents(autoScroll: false);
+  }
 
-      final export = OtlpLogExport.fromJson(event.data);
+  bool _processPendingEvents({required bool autoScroll}) {
+    var dirty = false;
+    for (
+      var index = _processedEventCount;
+      index < widget.events.length;
+      index += 1
+    ) {
+      dirty =
+          _appendEvent(widget.events[index], autoScroll: autoScroll) || dirty;
+    }
+    _processedEventCount = widget.events.length;
+    return dirty;
+  }
 
-      for (final resourceLogs in export.resourceLogs) {
-        for (final log in resourceLogs.scopeLogs) {
-          logs.addAll(log.logRecords);
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              if (scrollController.position.extentAfter < 100) {
-                scrollController.jumpTo(
-                  scrollController.position.maxScrollExtent,
-                );
-              }
-            }
-          });
-          dirty = true;
-        }
+  void _scheduleAutoScroll() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !scrollController.hasClients) {
+        return;
       }
+      if (scrollController.position.extentAfter < 100) {
+        scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      }
+    });
+  }
 
-      if (dirty) {
-        setState(() {});
+  bool _appendEvent(RoomEvent event, {required bool autoScroll}) {
+    if (event is! RoomLogEvent || event.name != "otel.log") {
+      return false;
+    }
+
+    final export = OtlpLogExport.fromJson(event.data);
+    var dirty = false;
+    for (final resourceLogs in export.resourceLogs) {
+      for (final scopeLogs in resourceLogs.scopeLogs) {
+        if (scopeLogs.logRecords.isEmpty) {
+          continue;
+        }
+        logs.addAll(scopeLogs.logRecords);
+        dirty = true;
       }
     }
+
+    if (dirty && autoScroll) {
+      _scheduleAutoScroll();
+    }
+
+    return dirty;
   }
 
   @override
   void dispose() {
-    sub?.cancel();
+    scrollController.dispose();
     super.dispose();
   }
-
-  final scrollController = ScrollController();
 
   @override
   Widget build(BuildContext context) {
@@ -868,65 +908,97 @@ class LiveMetricsViewer extends StatefulWidget {
   const LiveMetricsViewer({super.key, required this.events, this.pricing});
 
   final Map<String, dynamic>? pricing;
-  final Stream<RoomEvent> events;
+  final List<RoomEvent> events;
 
   @override
   State createState() => _LiveMetricsViewer();
 }
 
 class _LiveMetricsViewer extends State<LiveMetricsViewer> {
-  @override
-  void initState() {
-    super.initState();
-
-    sub = widget.events.listen(onEvent);
-  }
-
-  StreamSubscription? sub;
-
   final List<ScopeMetrics> metrics = [];
   final Map<String, num?> values = {};
   final Map<String, String> labels = {};
+  int _processedEventCount = 0;
 
-  void onEvent(RoomEvent event) {
-    if (event is RoomLogEvent && event.name == "otel.metric") {
-      var dirty = false;
+  @override
+  void initState() {
+    super.initState();
+    _rebuildMetrics();
+  }
 
-      final export = OtlpMetricExport.fromJson(event.data);
-      for (final rm in export.resourceMetrics) {
-        for (final sm in rm.scopeMetrics) {
-          for (final metric in sm.metrics) {
-            var name = metric.name;
-            String? model;
-            String? provider;
-            for (final dp in metric.sum?.dataPoints ?? <NumberDataPoint>[]) {
-              for (final attr in dp.attributes) {
-                if (attr.key == "model") {
-                  model = attr.value;
-                } else if (attr.key == "provider") {
-                  provider = attr.value;
-                }
-              }
-              if (model != null && provider != null) {
-                name = "$provider/$model/$name";
-              }
-              labels[name] = metric.unit ?? "";
-              values[name] = dp.value + (values[name] ?? 0);
-            }
-          }
-        }
-      }
+  @override
+  void didUpdateWidget(covariant LiveMetricsViewer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final shouldReset =
+        !identical(widget.events, oldWidget.events) ||
+        widget.events.length < _processedEventCount;
+    if (shouldReset) {
+      setState(_rebuildMetrics);
+      return;
+    }
 
-      if (dirty || true) {
+    if (widget.events.length > _processedEventCount) {
+      final dirty = _processPendingEvents();
+      if (dirty) {
         setState(() {});
       }
     }
   }
 
-  @override
-  void dispose() {
-    sub?.cancel();
-    super.dispose();
+  void _rebuildMetrics() {
+    metrics.clear();
+    values.clear();
+    labels.clear();
+    _processedEventCount = 0;
+    _processPendingEvents();
+  }
+
+  bool _processPendingEvents() {
+    var dirty = false;
+    for (
+      var index = _processedEventCount;
+      index < widget.events.length;
+      index += 1
+    ) {
+      dirty = _appendEvent(widget.events[index]) || dirty;
+    }
+    _processedEventCount = widget.events.length;
+    return dirty;
+  }
+
+  bool _appendEvent(RoomEvent event) {
+    if (event is! RoomLogEvent || event.name != "otel.metric") {
+      return false;
+    }
+
+    final export = OtlpMetricExport.fromJson(event.data);
+    var dirty = false;
+    for (final rm in export.resourceMetrics) {
+      for (final sm in rm.scopeMetrics) {
+        metrics.add(sm);
+        for (final metric in sm.metrics) {
+          var name = metric.name;
+          String? model;
+          String? provider;
+          for (final dp in metric.sum?.dataPoints ?? <NumberDataPoint>[]) {
+            for (final attr in dp.attributes) {
+              if (attr.key == "model") {
+                model = attr.value;
+              } else if (attr.key == "provider") {
+                provider = attr.value;
+              }
+            }
+            if (model != null && provider != null) {
+              name = "$provider/$model/$name";
+            }
+            labels[name] = metric.unit ?? "";
+            values[name] = dp.value + (values[name] ?? 0);
+            dirty = true;
+          }
+        }
+      }
+    }
+    return dirty;
   }
 
   String getPrice(Map<String, dynamic>? data, String key, num value) {
@@ -980,7 +1052,7 @@ class LiveTraceViewer extends StatefulWidget {
     this.searchQuery = "",
   });
 
-  final Stream<RoomEvent> events;
+  final List<RoomEvent> events;
   final String searchQuery;
 
   @override
@@ -988,38 +1060,68 @@ class LiveTraceViewer extends StatefulWidget {
 }
 
 class _LiveTraceViewerState extends State<LiveTraceViewer> {
-  StreamSubscription? sub;
   final spans = SpanCollection();
+  int _processedEventCount = 0;
 
   @override
   void initState() {
     super.initState();
-
-    sub = widget.events.listen(onEvent);
+    _rebuildTraces();
   }
 
-  void onEvent(RoomEvent event) {
-    if (event is RoomLogEvent && event.name == "otel.trace") {
-      final trace = OtlpTraceExport.fromJson(event.data);
-      var dirty = false;
-      for (final rs in trace.resourceSpans) {
-        for (final ss in rs.scopeSpans) {
-          for (final span in ss.spans) {
-            dirty = spans.add(span) || dirty;
-          }
-        }
-      }
+  @override
+  void didUpdateWidget(covariant LiveTraceViewer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final shouldReset =
+        !identical(widget.events, oldWidget.events) ||
+        widget.events.length < _processedEventCount;
+    if (shouldReset) {
+      setState(_rebuildTraces);
+      return;
+    }
 
+    if (widget.events.length > _processedEventCount) {
+      final dirty = _processPendingEvents();
       if (dirty) {
         setState(() {});
       }
     }
   }
 
-  @override
-  void dispose() {
-    sub?.cancel();
-    super.dispose();
+  void _rebuildTraces() {
+    spans.clear();
+    _processedEventCount = 0;
+    _processPendingEvents();
+  }
+
+  bool _processPendingEvents() {
+    var dirty = false;
+    for (
+      var index = _processedEventCount;
+      index < widget.events.length;
+      index += 1
+    ) {
+      dirty = _appendEvent(widget.events[index]) || dirty;
+    }
+    _processedEventCount = widget.events.length;
+    return dirty;
+  }
+
+  bool _appendEvent(RoomEvent event) {
+    if (event is! RoomLogEvent || event.name != "otel.trace") {
+      return false;
+    }
+
+    final trace = OtlpTraceExport.fromJson(event.data);
+    var dirty = false;
+    for (final rs in trace.resourceSpans) {
+      for (final ss in rs.scopeSpans) {
+        for (final span in ss.spans) {
+          dirty = spans.add(span) || dirty;
+        }
+      }
+    }
+    return dirty;
   }
 
   String _spanKey(Span span) => "${span.traceId}/${span.spanId}";
