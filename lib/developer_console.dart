@@ -259,6 +259,10 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                               adding = true;
                             });
                             try {
+                              final roomToken = widget.room.protocol.token;
+                              if (roomToken == null || roomToken.isEmpty) {
+                                throw StateError("room token unavailable");
+                              }
                               final containerId = await widget.room.containers
                                   .run(
                                     image: widget.shellImage,
@@ -266,14 +270,8 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                                     mounts: launchOptions.mounts,
                                     writableRootFs: true,
                                     env: {
-                                      "OPENAI_API_KEY":
-                                          (widget.room.protocol.channel
-                                                  as WebSocketProtocolChannel)
-                                              .jwt,
-                                      "MESHAGENT_TOKEN":
-                                          (widget.room.protocol.channel
-                                                  as WebSocketProtocolChannel)
-                                              .jwt,
+                                      "OPENAI_API_KEY": roomToken,
+                                      "MESHAGENT_TOKEN": roomToken,
                                     },
                                     private: true,
                                   );
