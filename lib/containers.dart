@@ -2595,7 +2595,13 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
     final mailDomain = const String.fromEnvironment("MESHAGENT_MAIL_DOMAIN");
     final emailSuffix = mailDomain.isEmpty ? "" : "@$mailDomain";
     final routeDomains = _routeDomains;
+    void dismissFocusedField(PointerDownEvent _) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
+
     Widget wrapCompactMobileField(Widget child) {
+      child = SizedBox(width: double.infinity, child: child);
+
       if (!usesCompactMobileLayout) {
         return child;
       }
@@ -2609,6 +2615,8 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
     }
 
     Widget wrapCompactMobileSelectField(Widget child) {
+      child = SizedBox(width: double.infinity, child: child);
+
       if (!usesCompactMobileLayout) {
         return child;
       }
@@ -2637,50 +2645,64 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                       mainAxisAlignment: MainAxisAlignment.start,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        wrapCompactMobileField(
-                          ShadInputFormField(
-                            id: v.name,
-                            constraints: usesCompactMobileLayout
-                                ? null
-                                : BoxConstraints(maxWidth: 400),
-                            padding: usesCompactMobileLayout
-                                ? EdgeInsets.zero
-                                : EdgeInsets.only(
-                                    left: 8,
-                                    top: 0,
-                                    bottom: 0,
-                                    right: 0,
-                                  ),
-                            label: Text(
+                        if (usesCompactMobileLayout)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
                               '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
                               style: labelStyle,
                             ),
-                            obscureText: v.obscure,
-                            initialValue: emailSuffix.isEmpty
-                                ? (_vars[v.name] ?? '')
-                                : (_vars[v.name] ?? '').replaceAll(
-                                    emailSuffix,
-                                    '',
-                                  ),
-                            onChanged: (txt) => setState(() {
-                              final normalized = txt.trim();
-                              if (normalized.isEmpty) {
-                                _vars[v.name] = "";
-                              } else if (emailSuffix.isEmpty) {
-                                _vars[v.name] = normalized;
-                              } else {
-                                _vars[v.name] = "$normalized$emailSuffix";
-                              }
-                            }),
-                            trailing: emailSuffix.isEmpty
-                                ? null
-                                : Container(
-                                    color: ShadTheme.of(
-                                      context,
-                                    ).colorScheme.muted,
-                                    padding: EdgeInsets.all(8),
-                                    child: Text(emailSuffix),
-                                  ),
+                          ),
+                        wrapCompactMobileField(
+                          Padding(
+                            padding: usesCompactMobileLayout
+                                ? const EdgeInsets.symmetric(horizontal: 4)
+                                : EdgeInsets.zero,
+                            child: ShadInputFormField(
+                              id: v.name,
+                              onPressedOutside: dismissFocusedField,
+                              constraints: null,
+                              padding: usesCompactMobileLayout
+                                  ? EdgeInsets.zero
+                                  : EdgeInsets.only(
+                                      left: 8,
+                                      top: 0,
+                                      bottom: 0,
+                                      right: 0,
+                                    ),
+                              label: usesCompactMobileLayout
+                                  ? null
+                                  : Text(
+                                      '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
+                                      style: labelStyle,
+                                    ),
+                              obscureText: v.obscure,
+                              initialValue: emailSuffix.isEmpty
+                                  ? (_vars[v.name] ?? '')
+                                  : (_vars[v.name] ?? '').replaceAll(
+                                      emailSuffix,
+                                      '',
+                                    ),
+                              onChanged: (txt) => setState(() {
+                                final normalized = txt.trim();
+                                if (normalized.isEmpty) {
+                                  _vars[v.name] = "";
+                                } else if (emailSuffix.isEmpty) {
+                                  _vars[v.name] = normalized;
+                                } else {
+                                  _vars[v.name] = "$normalized$emailSuffix";
+                                }
+                              }),
+                              trailing: emailSuffix.isEmpty
+                                  ? null
+                                  : Container(
+                                      color: ShadTheme.of(
+                                        context,
+                                      ).colorScheme.muted,
+                                      padding: EdgeInsets.all(8),
+                                      child: Text(emailSuffix),
+                                    ),
+                            ),
                           ),
                         ),
                         if (_variableDescription(v) case final description?)
@@ -2698,6 +2720,7 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                           wrapCompactMobileField(
                             ShadInputFormField(
                               id: "${v.name}_domain",
+                              onPressedOutside: dismissFocusedField,
                               label: Text(
                                 '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
                                 style: labelStyle,
@@ -2726,9 +2749,8 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                                 Expanded(
                                   child: wrapCompactMobileField(
                                     ShadInputFormField(
-                                      constraints: usesCompactMobileLayout
-                                          ? null
-                                          : BoxConstraints(maxWidth: 300),
+                                      onPressedOutside: dismissFocusedField,
+                                      constraints: null,
                                       padding: usesCompactMobileLayout
                                           ? EdgeInsets.zero
                                           : EdgeInsets.only(left: 8),
@@ -2766,9 +2788,8 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                               else
                                 wrapCompactMobileField(
                                   ShadInputFormField(
-                                    constraints: usesCompactMobileLayout
-                                        ? null
-                                        : BoxConstraints(maxWidth: 300),
+                                    onPressedOutside: dismissFocusedField,
+                                    constraints: null,
                                     padding: usesCompactMobileLayout
                                         ? EdgeInsets.zero
                                         : EdgeInsets.only(left: 8),
@@ -2820,6 +2841,7 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                           ? wrapCompactMobileField(
                               ShadInputFormField(
                                 id: v.name,
+                                onPressedOutside: dismissFocusedField,
                                 label: Text(
                                   '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
                                   style: labelStyle,
@@ -2845,44 +2867,54 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                               ),
                             )
                           : wrapCompactMobileSelectField(
-                              ShadSelectFormField<String>(
-                                label: Text(
-                                  _variableTitle(v),
-                                  style: labelStyle,
-                                ),
-                                id: v.name,
-                                initialValue:
-                                    v.enumValues!.contains(_vars[v.name])
-                                    ? _vars[v.name]
-                                    : v.enumValues!.first,
-                                selectedOptionBuilder: (context, value) =>
-                                    Text(value),
-                                options: [
-                                  ...v.enumValues!.map(
-                                    (val) => ShadOption<String>(
-                                      value: val,
-                                      child: Text(val),
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final fieldWidth = constraints.maxWidth;
+                                  return ShadSelectFormField<String>(
+                                    label: Text(
+                                      _variableTitle(v),
+                                      style: labelStyle,
                                     ),
-                                  ),
-                                ],
-                                description: _variableDescription(v) == null
-                                    ? null
-                                    : Text(
-                                        _variableDescription(v)!,
-                                        style: secondaryTextStyle,
+                                    id: v.name,
+                                    initialValue:
+                                        v.enumValues!.contains(_vars[v.name])
+                                        ? _vars[v.name]
+                                        : v.enumValues!.first,
+                                    minWidth: fieldWidth,
+                                    maxWidth: fieldWidth,
+                                    selectedOptionBuilder: (context, value) =>
+                                        Text(
+                                          value,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                    options: [
+                                      ...v.enumValues!.map(
+                                        (val) => ShadOption<String>(
+                                          value: val,
+                                          child: Text(val),
+                                        ),
                                       ),
-                                validator: v.optional
-                                    ? null
-                                    : (txt) {
-                                        final msg =
-                                            (txt?.trim().isEmpty == true ||
-                                                txt == null)
-                                            ? '${_variableTitle(v)} is required'
-                                            : null;
-                                        return msg;
-                                      },
-                                onChanged: (txt) =>
-                                    setState(() => _vars[v.name] = txt!),
+                                    ],
+                                    description: _variableDescription(v) == null
+                                        ? null
+                                        : Text(
+                                            _variableDescription(v)!,
+                                            style: secondaryTextStyle,
+                                          ),
+                                    validator: v.optional
+                                        ? null
+                                        : (txt) {
+                                            final msg =
+                                                (txt?.trim().isEmpty == true ||
+                                                    txt == null)
+                                                ? '${_variableTitle(v)} is required'
+                                                : null;
+                                            return msg;
+                                          },
+                                    onChanged: (txt) =>
+                                        setState(() => _vars[v.name] = txt!),
+                                  );
+                                },
                               ),
                             ),
                   },
