@@ -32,6 +32,36 @@ String _displayRegistryTag(String? tag) {
   return tag;
 }
 
+bool _usesAdaptiveTextSelectionToolbar() {
+  if (kIsWeb) {
+    return false;
+  }
+
+  return switch (defaultTargetPlatform) {
+    TargetPlatform.iOS || TargetPlatform.android => true,
+    TargetPlatform.fuchsia ||
+    TargetPlatform.linux ||
+    TargetPlatform.macOS ||
+    TargetPlatform.windows => false,
+  };
+}
+
+Widget _adaptiveInputContextMenuBuilder(
+  BuildContext context,
+  EditableTextState editableTextState,
+) {
+  if (_usesAdaptiveTextSelectionToolbar()) {
+    return TextFieldTapRegion(
+      groupId: editableTextState.widget.groupId,
+      child: AdaptiveTextSelectionToolbar.editableText(
+        editableTextState: editableTextState,
+      ),
+    );
+  }
+
+  return ShadInputState.defaultContextMenuBuilder(context, editableTextState);
+}
+
 String _registryReferenceKey(RegistryReference reference) {
   final tag = reference.tag;
   if (tag != null && tag.isNotEmpty) {
@@ -2627,9 +2657,17 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
   @override
   Widget build(BuildContext context) {
     final usesCompactMobileLayout = _usesCompactMobileDialogFormLayout(context);
+    final theme = ShadTheme.of(context);
     final labelStyle = _flowDialogInputLabelStyle(context);
     final contentTitleStyle = _flowDialogContentTitleStyle(context);
     final secondaryTextStyle = _flowDialogSecondaryTextStyle(context);
+    final compactMobileInputPadding = usesCompactMobileLayout
+        ? const EdgeInsets.only(left: 12, top: 0, bottom: 0, right: 0)
+        : const EdgeInsets.only(left: 8, top: 0, bottom: 0, right: 0);
+    final suffixTextStyle = theme.textTheme.small.copyWith(
+      color: theme.colorScheme.mutedForeground,
+      fontSize: usesCompactMobileLayout ? 14 : null,
+    );
     final mailDomain = const String.fromEnvironment("MESHAGENT_MAIL_DOMAIN");
     final emailSuffix = mailDomain.isEmpty ? "" : "@$mailDomain";
     final routeDomains = _routeDomains;
@@ -2709,15 +2747,11 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                             child: ShadInputFormField(
                               id: v.name,
                               onPressedOutside: dismissFocusedField,
+                              contextMenuBuilder:
+                                  _adaptiveInputContextMenuBuilder,
+                              groupId: v.name,
                               constraints: null,
-                              padding: usesCompactMobileLayout
-                                  ? EdgeInsets.zero
-                                  : EdgeInsets.only(
-                                      left: 8,
-                                      top: 0,
-                                      bottom: 0,
-                                      right: 0,
-                                    ),
+                              padding: compactMobileInputPadding,
                               label: usesCompactMobileLayout
                                   ? null
                                   : Text(
@@ -2744,11 +2778,15 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                               trailing: emailSuffix.isEmpty
                                   ? null
                                   : Container(
-                                      color: ShadTheme.of(
-                                        context,
-                                      ).colorScheme.muted,
-                                      padding: EdgeInsets.all(8),
-                                      child: Text(emailSuffix),
+                                      color: theme.colorScheme.muted,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 8,
+                                      ),
+                                      child: Text(
+                                        emailSuffix,
+                                        style: suffixTextStyle,
+                                      ),
                                     ),
                             ),
                           ),
@@ -2769,6 +2807,9 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                             ShadInputFormField(
                               id: "${v.name}_domain",
                               onPressedOutside: dismissFocusedField,
+                              contextMenuBuilder:
+                                  _adaptiveInputContextMenuBuilder,
+                              groupId: "${v.name}_domain",
                               label: Text(
                                 '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
                                 style: labelStyle,
@@ -2796,39 +2837,50 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                               if (usesCompactMobileLayout)
                                 Expanded(
                                   child: wrapCompactMobileField(
-                                    ShadInputFormField(
-                                      onPressedOutside: dismissFocusedField,
-                                      constraints: null,
-                                      padding: usesCompactMobileLayout
-                                          ? EdgeInsets.zero
-                                          : EdgeInsets.only(left: 8),
-                                      gap: 0,
-                                      id: "${v.name}_subdomain",
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                      label: Text(
-                                        '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
-                                        style: labelStyle,
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
                                       ),
-                                      initialValue:
-                                          _routeSubdomains[v.name] ?? "",
-                                      validator: v.optional
-                                          ? null
-                                          : (txt) => (txt.trim().isEmpty)
-                                                ? '${_variableTitle(v)} is required'
-                                                : null,
-                                      onChanged: (txt) {
-                                        setState(() {
-                                          _routeSubdomains[v.name] = txt.trim();
-                                          _syncRouteValue(v.name);
-                                        });
-                                      },
-                                      trailing: Container(
-                                        color: ShadTheme.of(
-                                          context,
-                                        ).colorScheme.muted,
-                                        padding: EdgeInsets.all(8),
-                                        child: Text(".${routeDomains.first}"),
+                                      child: ShadInputFormField(
+                                        onPressedOutside: dismissFocusedField,
+                                        contextMenuBuilder:
+                                            _adaptiveInputContextMenuBuilder,
+                                        groupId: "${v.name}_subdomain",
+                                        constraints: null,
+                                        padding: compactMobileInputPadding,
+                                        gap: 0,
+                                        id: "${v.name}_subdomain",
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        label: Text(
+                                          '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
+                                          style: labelStyle,
+                                        ),
+                                        initialValue:
+                                            _routeSubdomains[v.name] ?? "",
+                                        validator: v.optional
+                                            ? null
+                                            : (txt) => (txt.trim().isEmpty)
+                                                  ? '${_variableTitle(v)} is required'
+                                                  : null,
+                                        onChanged: (txt) {
+                                          setState(() {
+                                            _routeSubdomains[v.name] = txt
+                                                .trim();
+                                            _syncRouteValue(v.name);
+                                          });
+                                        },
+                                        trailing: Container(
+                                          color: theme.colorScheme.muted,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 8,
+                                          ),
+                                          child: Text(
+                                            ".${routeDomains.first}",
+                                            style: suffixTextStyle,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -2837,10 +2889,11 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                                 wrapCompactMobileField(
                                   ShadInputFormField(
                                     onPressedOutside: dismissFocusedField,
+                                    contextMenuBuilder:
+                                        _adaptiveInputContextMenuBuilder,
+                                    groupId: "${v.name}_subdomain",
                                     constraints: null,
-                                    padding: usesCompactMobileLayout
-                                        ? EdgeInsets.zero
-                                        : EdgeInsets.only(left: 8),
+                                    padding: compactMobileInputPadding,
                                     gap: 0,
                                     id: "${v.name}_subdomain",
                                     crossAxisAlignment:
@@ -2863,11 +2916,15 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                                       });
                                     },
                                     trailing: Container(
-                                      color: ShadTheme.of(
-                                        context,
-                                      ).colorScheme.muted,
-                                      padding: EdgeInsets.all(8),
-                                      child: Text(".${routeDomains.first}"),
+                                      color: theme.colorScheme.muted,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 8,
+                                      ),
+                                      child: Text(
+                                        ".${routeDomains.first}",
+                                        style: suffixTextStyle,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -2891,6 +2948,9 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                                 ShadInputFormField(
                                   id: v.name,
                                   onPressedOutside: dismissFocusedField,
+                                  contextMenuBuilder:
+                                      _adaptiveInputContextMenuBuilder,
+                                  groupId: v.name,
                                   label: Text(
                                     '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
                                     style: labelStyle,
