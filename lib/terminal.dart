@@ -80,9 +80,13 @@ class _RoomTerminal extends State<RoomTerminal> {
       onResize: onResize,
     );
 
-    final protocol = widget.client.protocol.channel as WebSocketProtocolChannel;
-    final url = protocol.url;
-    final jwt = protocol.jwt;
+    final url = widget.client.protocol.url;
+    final jwt = widget.client.protocol.token;
+    if (url == null || jwt == null || jwt.isEmpty) {
+      throw StateError(
+        "room protocol does not expose a websocket url and token",
+      );
+    }
 
     final execUrl = url.replace(
       path: "${url.path}/exec",
