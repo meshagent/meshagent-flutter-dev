@@ -70,6 +70,10 @@ bool _usesCompactMobileDialogFormLayout(BuildContext context) {
 }
 
 TextStyle _flowDialogContentTitleStyle(BuildContext context) {
+  if (!_usesCompactMobileDialogFormLayout(context)) {
+    return _flowDialogDesktopHeadingStyle(context);
+  }
+
   final theme = ShadTheme.of(context);
   return GoogleFonts.inter(
     textStyle: DefaultTextStyle.of(context).style,
@@ -78,7 +82,31 @@ TextStyle _flowDialogContentTitleStyle(BuildContext context) {
   );
 }
 
+TextStyle _flowDialogDesktopHeadingStyle(BuildContext context) {
+  final theme = ShadTheme.of(context);
+  return GoogleFonts.inter(
+    color: theme.colorScheme.foreground,
+    fontWeight: FontWeight.w600,
+    fontSize: 15,
+    height: 1.10,
+  );
+}
+
+TextStyle _flowDialogDesktopHelperStyle(BuildContext context) {
+  final theme = ShadTheme.of(context);
+  return GoogleFonts.inter(
+    color: theme.colorScheme.mutedForeground,
+    fontWeight: FontWeight.w400,
+    fontSize: 14,
+    height: 1.35,
+  );
+}
+
 TextStyle _flowDialogSecondaryTextStyle(BuildContext context) {
+  if (!_usesCompactMobileDialogFormLayout(context)) {
+    return _flowDialogDesktopHelperStyle(context);
+  }
+
   final theme = ShadTheme.of(context);
   return theme.textTheme.muted.copyWith(
     color: theme.colorScheme.mutedForeground,
@@ -90,12 +118,7 @@ TextStyle _flowDialogInputLabelStyle(BuildContext context) {
     return _flowDialogContentTitleStyle(context);
   }
 
-  final theme = ShadTheme.of(context);
-  return (theme.decoration.labelStyle ?? DefaultTextStyle.of(context).style)
-      .copyWith(
-        color: theme.colorScheme.foreground,
-        fontWeight: FontWeight.w700,
-      );
+  return _flowDialogDesktopHeadingStyle(context);
 }
 
 String _roomRegistryReferenceRef(
@@ -2294,8 +2317,13 @@ class _ServiceInstallSummary {
 }
 
 class ServiceInfoCard extends StatelessWidget {
-  const ServiceInfoCard({super.key, required this.manifest});
+  const ServiceInfoCard({
+    super.key,
+    required this.manifest,
+    this.desktopContentGroupGap,
+  });
   final ServiceTemplateSpec manifest;
+  final double? desktopContentGroupGap;
 
   _ServiceInstallSummary _summarize(List<PortSpec> ports) {
     final keys = <String>{};
@@ -2338,12 +2366,15 @@ class ServiceInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelStyle = _flowDialogContentTitleStyle(context);
+    final labelStyle = _flowDialogInputLabelStyle(context);
     final secondaryTextStyle = _flowDialogSecondaryTextStyle(context);
     final usesCompactMobileLayout = _usesCompactMobileDialogFormLayout(context);
+    final bulletTextStyle = usesCompactMobileLayout
+        ? secondaryTextStyle
+        : secondaryTextStyle.copyWith(height: 1.5);
     final contentGroupGap = usesCompactMobileLayout
         ? _flowDialogCompactMobileTextGroupGap
-        : _flowDialogGroupGap;
+        : (desktopContentGroupGap ?? _flowDialogGroupGap);
     final contentInlineGap = usesCompactMobileLayout
         ? _flowDialogCompactMobileTextInlineGap
         : _flowDialogInlineGap;
@@ -2382,30 +2413,27 @@ class ServiceInfoCard extends StatelessWidget {
                 children: [
                   for (final a in manifest.agents) ...[
                     if (a.annotations["meshagent.agent.type"] == "ChatBot")
-                      Text("• A chatbot", style: secondaryTextStyle),
+                      Text("• A chatbot", style: bulletTextStyle),
                     if (a.annotations["meshagent.agent.type"] == "Mailbot")
-                      Text("• A mailbot", style: secondaryTextStyle),
+                      Text("• A mailbot", style: bulletTextStyle),
                     if (a.annotations["meshagent.agent.type"] == "VoiceBot")
-                      Text("• A voicebot", style: secondaryTextStyle),
+                      Text("• A voicebot", style: bulletTextStyle),
                     if (a.annotations["meshagent.agent.type"] == "Shell")
-                      Text(
-                        "• A terminal based agent",
-                        style: secondaryTextStyle,
-                      ),
+                      Text("• A terminal based agent", style: bulletTextStyle),
                     if (a.annotations["meshagent.agent.widget"] != null)
-                      Text("• A custom interface", style: secondaryTextStyle),
+                      Text("• A custom interface", style: bulletTextStyle),
                     if (a.annotations["meshagent.agent.database.schema"] !=
                         null)
-                      Text("• A custom database", style: secondaryTextStyle),
+                      Text("• A custom database", style: bulletTextStyle),
                     if (a.annotations["meshagent.agent.schedule"] != null)
-                      Text("• Scheduled tasks", style: secondaryTextStyle),
+                      Text("• Scheduled tasks", style: bulletTextStyle),
                   ],
                   if (summary.installsMcp)
-                    Text("• An MCP connector", style: secondaryTextStyle),
+                    Text("• An MCP connector", style: bulletTextStyle),
                   if (summary.installsMcp && hasFilteredAgentName)
                     Text(
                       "• This MCP connector will only be installed for agent '$filteredAgentName'",
-                      style: secondaryTextStyle,
+                      style: bulletTextStyle,
                     ),
                 ],
               ),
@@ -2422,9 +2450,13 @@ class ServiceInfoCard extends StatelessWidget {
                 left: usesCompactMobileLayout ? 0 : 8,
                 top: contentInlineGap,
               ),
-              child: Text(
-                permissionLines.map((line) => "• $line").join("\n"),
-                style: secondaryTextStyle.copyWith(height: 1.55),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final line in permissionLines)
+                    Text("• $line", style: bulletTextStyle),
+                ],
               ),
             ),
           ],
@@ -2444,6 +2476,9 @@ class ConfigureServiceTemplate extends StatefulWidget {
     this.customActions = const [],
     this.header = const [],
     this.showActionRow = true,
+    this.desktopHorizontalPadding = 12,
+    this.desktopSectionSpacing = 10,
+    this.desktopHeaderBottomSpacing,
     this.onFormStateChanged,
   });
 
@@ -2453,6 +2488,9 @@ class ConfigureServiceTemplate extends StatefulWidget {
   final List<Widget> customActions;
   final List<Widget> header;
   final bool showActionRow;
+  final double desktopHorizontalPadding;
+  final double desktopSectionSpacing;
+  final double? desktopHeaderBottomSpacing;
   final void Function(Map<String, String> vars, bool Function() validate)?
   onFormStateChanged;
 
@@ -2629,12 +2667,22 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
       );
     }
 
+    Widget wrapDesktopFieldGroup(Widget child) {
+      if (usesCompactMobileLayout) {
+        return child;
+      }
+
+      return Padding(padding: const EdgeInsets.only(bottom: 7), child: child);
+    }
+
     final actions = widget.actionsBuilder(context, _vars, _validate);
     widget.onFormStateChanged?.call(
       Map<String, String>.unmodifiable(_vars),
       _validate,
     );
     final headerFields = List<Widget>.of(widget.header);
+    final desktopHeaderBottomSpacing =
+        widget.desktopHeaderBottomSpacing ?? widget.desktopSectionSpacing;
     final contentFields =
         [
               if (widget.spec.variables?.isNotEmpty ?? false) ...[
@@ -2655,9 +2703,9 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                           ),
                         wrapCompactMobileField(
                           Padding(
-                            padding: usesCompactMobileLayout
-                                ? const EdgeInsets.symmetric(horizontal: 4)
-                                : EdgeInsets.zero,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: usesCompactMobileLayout ? 4 : 4,
+                            ),
                             child: ShadInputFormField(
                               id: v.name,
                               onPressedOutside: dismissFocusedField,
@@ -2838,83 +2886,90 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                     ),
                     _ =>
                       v.enumValues == null
-                          ? wrapCompactMobileField(
-                              ShadInputFormField(
-                                id: v.name,
-                                onPressedOutside: dismissFocusedField,
-                                label: Text(
-                                  '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
-                                  style: labelStyle,
+                          ? wrapDesktopFieldGroup(
+                              wrapCompactMobileField(
+                                ShadInputFormField(
+                                  id: v.name,
+                                  onPressedOutside: dismissFocusedField,
+                                  label: Text(
+                                    '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
+                                    style: labelStyle,
+                                  ),
+                                  obscureText: v.obscure,
+                                  initialValue: _vars[v.name] ?? '',
+                                  description: _variableDescription(v) == null
+                                      ? null
+                                      : Text(
+                                          _variableDescription(v)!,
+                                          style: secondaryTextStyle,
+                                        ),
+                                  validator: (txt) {
+                                    final val = txt.trim();
+                                    if (v.optional) return null;
+                                    final msg = val.isEmpty
+                                        ? '${_variableTitle(v)} is required'
+                                        : null;
+                                    return msg;
+                                  },
+                                  onChanged: (txt) => setState(
+                                    () => _vars[v.name] = txt.trim(),
+                                  ),
                                 ),
-                                obscureText: v.obscure,
-                                initialValue: _vars[v.name] ?? '',
-                                description: _variableDescription(v) == null
-                                    ? null
-                                    : Text(
-                                        _variableDescription(v)!,
-                                        style: secondaryTextStyle,
-                                      ),
-                                validator: (txt) {
-                                  final val = txt.trim();
-                                  if (v.optional) return null;
-                                  final msg = val.isEmpty
-                                      ? '${_variableTitle(v)} is required'
-                                      : null;
-                                  return msg;
-                                },
-                                onChanged: (txt) =>
-                                    setState(() => _vars[v.name] = txt.trim()),
                               ),
                             )
-                          : wrapCompactMobileSelectField(
-                              LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final fieldWidth = constraints.maxWidth;
-                                  return ShadSelectFormField<String>(
-                                    label: Text(
-                                      _variableTitle(v),
-                                      style: labelStyle,
-                                    ),
-                                    id: v.name,
-                                    initialValue:
-                                        v.enumValues!.contains(_vars[v.name])
-                                        ? _vars[v.name]
-                                        : v.enumValues!.first,
-                                    minWidth: fieldWidth,
-                                    maxWidth: fieldWidth,
-                                    selectedOptionBuilder: (context, value) =>
-                                        Text(
-                                          value,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                    options: [
-                                      ...v.enumValues!.map(
-                                        (val) => ShadOption<String>(
-                                          value: val,
-                                          child: Text(val),
-                                        ),
+                          : wrapDesktopFieldGroup(
+                              wrapCompactMobileSelectField(
+                                LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final fieldWidth = constraints.maxWidth;
+                                    return ShadSelectFormField<String>(
+                                      label: Text(
+                                        _variableTitle(v),
+                                        style: labelStyle,
                                       ),
-                                    ],
-                                    description: _variableDescription(v) == null
-                                        ? null
-                                        : Text(
-                                            _variableDescription(v)!,
-                                            style: secondaryTextStyle,
+                                      id: v.name,
+                                      initialValue:
+                                          v.enumValues!.contains(_vars[v.name])
+                                          ? _vars[v.name]
+                                          : v.enumValues!.first,
+                                      minWidth: fieldWidth,
+                                      maxWidth: fieldWidth,
+                                      selectedOptionBuilder: (context, value) =>
+                                          Text(
+                                            value,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                    validator: v.optional
-                                        ? null
-                                        : (txt) {
-                                            final msg =
-                                                (txt?.trim().isEmpty == true ||
-                                                    txt == null)
-                                                ? '${_variableTitle(v)} is required'
-                                                : null;
-                                            return msg;
-                                          },
-                                    onChanged: (txt) =>
-                                        setState(() => _vars[v.name] = txt!),
-                                  );
-                                },
+                                      options: [
+                                        ...v.enumValues!.map(
+                                          (val) => ShadOption<String>(
+                                            value: val,
+                                            child: Text(val),
+                                          ),
+                                        ),
+                                      ],
+                                      description:
+                                          _variableDescription(v) == null
+                                          ? null
+                                          : Text(
+                                              _variableDescription(v)!,
+                                              style: secondaryTextStyle,
+                                            ),
+                                      validator: v.optional
+                                          ? null
+                                          : (txt) {
+                                              final msg =
+                                                  (txt?.trim().isEmpty ==
+                                                          true ||
+                                                      txt == null)
+                                                  ? '${_variableTitle(v)} is required'
+                                                  : null;
+                                              return msg;
+                                            },
+                                      onChanged: (txt) =>
+                                          setState(() => _vars[v.name] = txt!),
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                   },
@@ -2948,7 +3003,7 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                 margin: EdgeInsets.only(
                   bottom: usesCompactMobileLayout
                       ? _flowDialogCompactMobileSectionGap
-                      : 10,
+                      : widget.desktopSectionSpacing,
                 ),
                 child: x,
               ),
@@ -2965,12 +3020,17 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
             ...contentFields,
           ]
         : <Widget>[
-            ...headerFields.map(
-              (x) => Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                child: x,
+            for (var i = 0; i < headerFields.length; i++)
+              Container(
+                margin: EdgeInsets.only(
+                  bottom: i == headerFields.length - 1
+                      ? 0
+                      : widget.desktopSectionSpacing,
+                ),
+                child: headerFields[i],
               ),
-            ),
+            if (headerFields.isNotEmpty && contentFields.isNotEmpty)
+              SizedBox(height: desktopHeaderBottomSpacing),
             ...contentFields,
           ];
 
@@ -2991,7 +3051,9 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                 Expanded(
                   child: ListView(
                     padding: EdgeInsets.symmetric(
-                      horizontal: usesCompactMobileLayout ? 0 : 12,
+                      horizontal: usesCompactMobileLayout
+                          ? 0
+                          : widget.desktopHorizontalPadding,
                     ),
                     children: formFields,
                   ),
@@ -2999,7 +3061,9 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
               else
                 Padding(
                   padding: EdgeInsets.symmetric(
-                    horizontal: usesCompactMobileLayout ? 0 : 12,
+                    horizontal: usesCompactMobileLayout
+                        ? 0
+                        : widget.desktopHorizontalPadding,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
