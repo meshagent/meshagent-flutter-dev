@@ -762,7 +762,6 @@ class RegistryTable extends StatefulWidget {
 
 class _RegistryTableState extends State<RegistryTable> {
   late Future<List<String>> _repositoriesFuture;
-  late Timer _timer;
 
   Future<List<String>> _loadRepositories() async {
     final repositories = <String>[];
@@ -791,25 +790,10 @@ class _RegistryTableState extends State<RegistryTable> {
   void initState() {
     super.initState();
     _repositoriesFuture = _loadRepositories();
-    _timer = Timer.periodic(const Duration(seconds: 1), _onTick);
-  }
-
-  void _onTick(Timer timer) {
-    _loadRepositories().then((repositories) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _repositoriesFuture = SynchronousFuture(repositories);
-      });
-    });
   }
 
   @override
-  void dispose() {
-    _timer.cancel();
-    super.dispose();
-  }
+  void dispose() => super.dispose();
 
   Future<void> _reload() async {
     if (!mounted) {
