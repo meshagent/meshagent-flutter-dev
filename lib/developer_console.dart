@@ -100,7 +100,6 @@ enum DeveloperConsoleView {
   terminal,
   containers,
   images,
-  registry,
   services,
 }
 
@@ -468,10 +467,6 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                         child: _tabLabel("Images", .images),
                       ),
                       ShadTab(
-                        value: .registry,
-                        child: _tabLabel("Registry", .registry),
-                      ),
-                      ShadTab(
                         value: .services,
                         child: _tabLabel("Services", .services),
                       ),
@@ -617,9 +612,6 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
               DeveloperConsoleView.containers => ContainerTable(
                 client: widget.room,
                 onRun: onRun,
-              ),
-              DeveloperConsoleView.registry => RegistryTable(
-                client: widget.room,
               ),
               DeveloperConsoleView.services => ServiceTable(
                 client: widget.room,
