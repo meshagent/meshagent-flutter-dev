@@ -793,6 +793,7 @@ class _ContainerTableState extends State<ContainerTable> {
                             DataColumn(label: Text('Status')),
                             DataColumn(label: Text('Name')),
                             DataColumn(label: Text('Image')),
+                            DataColumn(label: Text('Ports')),
                             DataColumn(label: Text('Started by')),
                             DataColumn(label: Text('')), // stop‑button column
                           ],
@@ -870,6 +871,20 @@ class _ContainerTableState extends State<ContainerTable> {
                                         overflow: TextOverflow.ellipsis,
                                         [c.image].join(' '),
                                         style: TextStyle(color: null),
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxWidth: constraints.maxWidth * .2,
+                                      ),
+                                      child: Text(
+                                        c.ports.isEmpty
+                                            ? ''
+                                            : c.ports.join(', '),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                   ),
