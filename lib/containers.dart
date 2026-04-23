@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:meshagent/meshagent.dart';
+import 'package:meshagent_flutter_shadcn/ui/ui.dart';
 import './ansi.dart';
 
 import 'package:shadcn_ui/shadcn_ui.dart';
@@ -605,8 +606,11 @@ class _ImageTableState extends State<ImageTable> {
   late Future<List<ContainerImage>> _imagesFuture;
 
   String _displayImageRef(ContainerImage image) {
-    if (image.tags.isNotEmpty) {
-      return image.tags.first;
+    if (image.preferredRef != null && image.preferredRef!.isNotEmpty) {
+      return image.preferredRef!;
+    }
+    if (image.references.isNotEmpty) {
+      return image.references.first;
     }
     return image.id;
   }
@@ -670,8 +674,8 @@ class _ImageTableState extends State<ImageTable> {
           child: DataTable(
             columns: const [
               DataColumn(label: Text("")),
-              DataColumn(label: Text('Tag')),
-              DataColumn(label: Text('Size (MB)')),
+              DataColumn(label: Text('Reference')),
+              DataColumn(label: Text('Updated')),
               DataColumn(label: Text('')),
             ],
             rows: [
@@ -727,71 +731,95 @@ class _ImageTableState extends State<ImageTable> {
                         },
                       ),
                     ),
-
                     DataCell(
                       Row(
                         children: [
-                          SizedBox(width: 10),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: SelectableText(
                               _displayImageRef(img),
-                              style: TextStyle(),
+                              style: const TextStyle(),
                             ),
                           ),
                         ],
                       ),
                     ),
+                    DataCell(Text(_formatImageTimeAgo(img.updatedAt))),
                     DataCell(
-                      Text(
-                        img.size != null
-                            ? (img.size! / (1024 * 1024)).toStringAsFixed(1)
-                            : '‑',
-                      ),
-                    ),
-
-                    DataCell(
-                      IconButton(
-                        icon: const Icon(LucideIcons.delete),
-                        tooltip: 'Delete',
-                        onPressed: () async {
-                          final confirm =
-                              await showShadDialog<bool>(
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(LucideIcons.info),
+                            tooltip: 'Inspect',
+                            onPressed: () {
+                              showShadSheet(
+                                side: ShadSheetSide.right,
                                 context: context,
-                                builder: (ctx) => ShadDialog(
-                                  title: const Text('Delete image?'),
-                                  child: Text(_displayImageRef(img)),
-                                  actions: [
-                                    ShadButton.secondary(
-                                      onPressed: () =>
-                                          Navigator.pop(ctx, false),
-                                      child: const Text('Cancel'),
+                                builder: (context) {
+                                  final sheetWidth =
+                                      MediaQuery.sizeOf(context).width * 0.94;
+                                  return ShadSheet(
+                                    title: Text(_displayImageRef(img)),
+                                    constraints: BoxConstraints(
+                                      minWidth: sheetWidth,
+                                      maxWidth: sheetWidth,
                                     ),
-                                    ShadButton.destructive(
-                                      onPressed: () => Navigator.pop(ctx, true),
-                                      child: const Text('Delete'),
+                                    child: _ImageDetailsSheet(
+                                      client: widget.client,
+                                      imageId: img.id,
                                     ),
-                                  ],
-                                ),
-                              ) ??
-                              false;
-                          if (!confirm) return;
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(LucideIcons.delete),
+                            tooltip: 'Delete',
+                            onPressed: () async {
+                              final confirm =
+                                  await showShadDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => ShadDialog(
+                                      title: const Text('Delete image?'),
+                                      child: Text(_displayImageRef(img)),
+                                      actions: [
+                                        ShadButton.secondary(
+                                          onPressed: () =>
+                                              Navigator.pop(ctx, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        ShadButton.destructive(
+                                          onPressed: () =>
+                                              Navigator.pop(ctx, true),
+                                          child: const Text('Delete'),
+                                        ),
+                                      ],
+                                    ),
+                                  ) ??
+                                  false;
+                              if (!confirm) return;
 
-                          try {
-                            await widget.client.containers.deleteImage(
-                              image: _displayImageRef(img),
-                            );
-                            ShadToaster.of(context).show(
-                              const ShadToast(
-                                description: Text('Deleted image'),
-                              ),
-                            );
-                            _reload();
-                          } catch (e) {
-                            ShadToaster.of(context).show(
-                              ShadToast(description: Text('Delete failed: $e')),
-                            );
-                          }
-                        },
+                              try {
+                                await widget.client.containers.deleteImage(
+                                  image: _displayImageRef(img),
+                                );
+                                ShadToaster.of(context).show(
+                                  const ShadToast(
+                                    description: Text('Deleted image'),
+                                  ),
+                                );
+                                _reload();
+                              } catch (e) {
+                                ShadToaster.of(context).show(
+                                  ShadToast(
+                                    description: Text('Delete failed: $e'),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -800,6 +828,232 @@ class _ImageTableState extends State<ImageTable> {
           ),
         );
       },
+    );
+  }
+}
+
+String _formatImageTimeAgo(DateTime? value) {
+  if (value == null) {
+    return '—';
+  }
+  return timeAgo(value.toLocal());
+}
+
+String _formatImageBytes(int? value) {
+  if (value == null) {
+    return '—';
+  }
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  var size = value.toDouble();
+  var unitIndex = 0;
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex += 1;
+  }
+  final fractionDigits = unitIndex == 0 ? 0 : 1;
+  return '${size.toStringAsFixed(fractionDigits)} ${units[unitIndex]}';
+}
+
+class _ImageDetailsSheet extends StatelessWidget {
+  const _ImageDetailsSheet({required this.client, required this.imageId});
+
+  final RoomClient client;
+  final String imageId;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<ContainerImageInspection>(
+      future: client.containers.inspectImage(imageId: imageId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Text('Unable to load image details: ${snapshot.error}');
+        }
+
+        final inspection = snapshot.data!;
+        final image = inspection.image;
+
+        return SelectionArea(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ImageInfoTable(
+                  rows: [
+                    MapEntry('Reference', image.preferredRef ?? image.id),
+                    MapEntry('ID', image.id),
+                    MapEntry('Created', _formatImageTimeAgo(image.createdAt)),
+                    MapEntry('Updated', _formatImageTimeAgo(image.updatedAt)),
+                    MapEntry('Target Media Type', image.targetMediaType ?? '—'),
+                    MapEntry(
+                      'Content Size',
+                      _formatImageBytes(inspection.contentSize),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                if (image.labels.isNotEmpty) ...[
+                  Text('Labels', style: ShadTheme.of(context).textTheme.large),
+                  const SizedBox(height: 8),
+                  _ImageKeyValueTable(values: image.labels),
+                  const SizedBox(height: 20),
+                ],
+                if (inspection.manifests.isNotEmpty) ...[
+                  Text(
+                    'Manifests',
+                    style: ShadTheme.of(context).textTheme.large,
+                  ),
+                  const SizedBox(height: 8),
+                  _ImageManifestTable(manifests: inspection.manifests),
+                  const SizedBox(height: 20),
+                ],
+                Text('Layers', style: ShadTheme.of(context).textTheme.large),
+                const SizedBox(height: 8),
+                _ImageDescriptorTable(descriptors: inspection.layers),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ImageInfoTable extends StatelessWidget {
+  const _ImageInfoTable({required this.rows});
+
+  final List<MapEntry<String, String>> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return Table(
+      columnWidths: const {0: IntrinsicColumnWidth(), 1: FlexColumnWidth()},
+      defaultVerticalAlignment: TableCellVerticalAlignment.top,
+      children: [
+        for (final row in rows)
+          TableRow(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 12, bottom: 8),
+                child: Text(
+                  '${row.key}:',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SelectableText(row.value),
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+class _ImageKeyValueTable extends StatelessWidget {
+  const _ImageKeyValueTable({required this.values});
+
+  final Map<String, String> values;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        columns: const [
+          DataColumn(label: Text('Key')),
+          DataColumn(label: Text('Value')),
+        ],
+        rows: [
+          for (final entry in values.entries)
+            DataRow(
+              cells: [
+                DataCell(SelectableText(entry.key)),
+                DataCell(SelectableText(entry.value)),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImageManifestTable extends StatelessWidget {
+  const _ImageManifestTable({required this.manifests});
+
+  final List<ContainerImageManifest> manifests;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        columns: const [
+          DataColumn(label: Text('Digest')),
+          DataColumn(label: Text('Media Type')),
+          DataColumn(label: Text('Size')),
+          DataColumn(label: Text('Platform')),
+        ],
+        rows: [
+          for (final manifest in manifests)
+            DataRow(
+              cells: [
+                DataCell(SelectableText(manifest.descriptor.digest)),
+                DataCell(SelectableText(manifest.descriptor.mediaType ?? '—')),
+                DataCell(Text(_formatImageBytes(manifest.descriptor.size))),
+                DataCell(
+                  Text(() {
+                    final platform = [
+                      manifest.platformOs,
+                      manifest.platformArchitecture,
+                      manifest.platformVariant,
+                    ].whereType<String>().join('/');
+                    return platform.isEmpty ? '—' : platform;
+                  }()),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImageDescriptorTable extends StatelessWidget {
+  const _ImageDescriptorTable({required this.descriptors});
+
+  final List<ContainerImageDescriptor> descriptors;
+
+  @override
+  Widget build(BuildContext context) {
+    if (descriptors.isEmpty) {
+      return const Text('No descriptors');
+    }
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        columns: const [
+          DataColumn(label: Text('Digest')),
+          DataColumn(label: Text('Media Type')),
+          DataColumn(label: Text('Size')),
+        ],
+        rows: [
+          for (final descriptor in descriptors)
+            DataRow(
+              cells: [
+                DataCell(SelectableText(descriptor.digest)),
+                DataCell(SelectableText(descriptor.mediaType ?? '—')),
+                DataCell(Text(_formatImageBytes(descriptor.size))),
+              ],
+            ),
+        ],
+      ),
     );
   }
 }
