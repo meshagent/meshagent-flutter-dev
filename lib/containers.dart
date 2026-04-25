@@ -1747,7 +1747,7 @@ class ServiceNameCard extends StatelessWidget {
 final permissionHelp = {
   "agents": "Use tools in the room or talk to other agents",
   "containers": "Run custom code in sandboxed containers",
-  "database": "Interact with database tables",
+  "datasets": "Interact with dataset tables",
   "developer": "Watch logs in the room",
   "livekit": "Join meetings",
   "messaging": "Communicate with users and agents",
@@ -1856,9 +1856,9 @@ class ServiceInfoCard extends StatelessWidget {
                       Text("• A terminal based agent"),
                     if (a.annotations["meshagent.agent.widget"] != null)
                       Text("• A custom interface"),
-                    if (a.annotations["meshagent.agent.database.schema"] !=
+                    if (a.annotations["meshagent.agent.dataset.schema"] !=
                         null)
-                      Text("• A custom database"),
+                      Text("• A custom dataset"),
                     if (a.annotations["meshagent.agent.schedule"] != null)
                       Text("• Scheduled tasks"),
                   ],
