@@ -1856,8 +1856,7 @@ class ServiceInfoCard extends StatelessWidget {
                       Text("• A terminal based agent"),
                     if (a.annotations["meshagent.agent.widget"] != null)
                       Text("• A custom interface"),
-                    if (a.annotations["meshagent.agent.dataset.schema"] !=
-                        null)
+                    if (a.annotations["meshagent.agent.dataset.schema"] != null)
                       Text("• A custom dataset"),
                     if (a.annotations["meshagent.agent.schedule"] != null)
                       Text("• Scheduled tasks"),
