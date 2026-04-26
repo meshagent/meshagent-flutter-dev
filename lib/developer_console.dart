@@ -7,6 +7,7 @@ import 'package:meshagent/meshagent.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 import 'containers.dart';
+import 'developer_console_layout.dart';
 import 'terminal.dart';
 import 'trace_viewer.dart';
 
@@ -102,6 +103,29 @@ enum DeveloperConsoleView {
   images,
   services,
 }
+
+class _DeveloperConsoleTabConfig {
+  const _DeveloperConsoleTabConfig(this.view, this.label);
+
+  final DeveloperConsoleView view;
+  final String label;
+}
+
+const List<_DeveloperConsoleTabConfig> _developerConsolePrimaryTabs = [
+  _DeveloperConsoleTabConfig(DeveloperConsoleView.logs, "Logs"),
+  _DeveloperConsoleTabConfig(DeveloperConsoleView.traces, "Traces"),
+  _DeveloperConsoleTabConfig(DeveloperConsoleView.metrics, "Metrics"),
+];
+
+const List<_DeveloperConsoleTabConfig> _developerConsoleResourceTabs = [
+  _DeveloperConsoleTabConfig(DeveloperConsoleView.containers, "Containers"),
+  _DeveloperConsoleTabConfig(DeveloperConsoleView.images, "Images"),
+  _DeveloperConsoleTabConfig(DeveloperConsoleView.services, "Services"),
+];
+
+const List<_DeveloperConsoleTabConfig> _developerConsoleTerminalTabs = [
+  _DeveloperConsoleTabConfig(DeveloperConsoleView.terminal, "Terminal"),
+];
 
 class RoomDeveloperConsole extends StatefulWidget {
   const RoomDeveloperConsole({
@@ -278,141 +302,272 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
     );
   }
 
-  Widget terminalView(BuildContext context) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 300,
-          child: ListView(
-            padding: .symmetric(horizontal: 20, vertical: 8),
+  Widget _buildTabGroup(List<_DeveloperConsoleTabConfig> tabs) {
+    return ShadTabs<DeveloperConsoleView>(
+      value: view,
+      onChanged: _setView,
+      tabs: [
+        for (final tab in tabs)
+          ShadTab(value: tab.view, child: _tabLabel(tab.label, tab.view)),
+      ],
+    );
+  }
+
+  Widget _buildViewSwitcher() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < developerConsoleCompactWidth) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  ShadButton.secondary(
-                    leading: adding
-                        ? SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(),
-                          )
-                        : Icon(LucideIcons.plus),
-                    onPressed: adding
-                        ? null
-                        : () async {
-                            final launchOptions = await promptForImageTerminal(
-                              context,
-                              initialCommand: "bash -l",
-                              initialRoomMounts: [
-                                RoomStorageMountSpec(
-                                  path: "/data",
-                                  readOnly: false,
-                                ),
-                              ],
-                            );
-                            if (launchOptions == null) {
-                              return;
-                            }
-                            setState(() {
-                              adding = true;
-                            });
-                            try {
-                              final roomToken = widget.room.protocol.token;
-                              if (roomToken == null || roomToken.isEmpty) {
-                                throw StateError("room token unavailable");
-                              }
-                              final containerId = await widget.room.containers
-                                  .run(
-                                    image: widget.shellImage,
-                                    command: "sleep infinity",
-                                    mounts: launchOptions.mounts,
-                                    writableRootFs: true,
-                                    env: {
-                                      "OPENAI_API_KEY": roomToken,
-                                      "MESHAGENT_TOKEN": roomToken,
-                                    },
-                                    private: true,
-                                  );
-
-                              final run = widget.room.containers.exec(
-                                containerId: containerId,
-                                command: launchOptions.command,
-                                tty: true,
-                              );
-                              if (!mounted) {
-                                return;
-                              }
-                              setState(() {
-                                runs.add(run);
-                                selectedRun = run;
-                              });
-                            } on RoomServerException catch (err) {
-                              showShadDialog(
-                                context: context,
-                                builder: (context) => ShadDialog.alert(
-                                  title: Text("Unable to run container"),
-                                  description: Text("$err"),
-                                ),
-                              );
-                            } finally {
-                              if (mounted) {
-                                setState(() {
-                                  adding = false;
-                                });
-                              }
-                            }
-                          },
-                    child: Text("Add Terminal"),
+                  Expanded(child: _buildTabGroup(_developerConsolePrimaryTabs)),
+                  SizedBox(width: developerConsoleSectionGap),
+                  SizedBox(
+                    width: 150,
+                    child: _buildTabGroup(_developerConsoleTerminalTabs),
                   ),
-                  Spacer(),
                 ],
               ),
-              for (final run in runs)
-                Row(
-                  spacing: 8,
-                  children: [
-                    Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(top: 8),
-                        child:
-                            (selectedRun == run
-                            ? ShadButton.secondary
-                            : ShadButton.ghost)(
-                              onPressed: () {
-                                setState(() {
-                                  selectedRun = run;
-                                });
-                              },
-                              child: Text(run.command),
-                            ),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: ShadButton.ghost(
-                        onPressed: () {
-                          setState(() {
-                            run.stop();
-                            runs.remove(run);
-                          });
-                        },
-                        child: Icon(LucideIcons.x),
-                      ),
-                    ),
-                  ],
-                ),
+              SizedBox(height: developerConsoleControlGap),
+              _buildTabGroup(_developerConsoleResourceTabs),
             ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 3,
+              child: _buildTabGroup(_developerConsolePrimaryTabs),
+            ),
+            SizedBox(width: developerConsoleSectionGap),
+            Expanded(
+              flex: 5,
+              child: _buildTabGroup(_developerConsoleResourceTabs),
+            ),
+            SizedBox(width: developerConsoleSectionGap),
+            Expanded(
+              flex: 2,
+              child: _buildTabGroup(_developerConsoleTerminalTabs),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildFilterControls() {
+    final placeholder = view == DeveloperConsoleView.traces
+        ? "Filter traces..."
+        : "Filter...";
+
+    return Row(
+      children: [
+        Expanded(
+          child: ShadInput(
+            placeholder: Text(placeholder),
+            onChanged: (value) {
+              setState(() {
+                if (view == DeveloperConsoleView.traces) {
+                  traceFilter = value;
+                } else {
+                  logFilter = value;
+                }
+              });
+            },
           ),
         ),
-
-        Expanded(
-          child: selectedRun != null
-              ? ContainerTerminal(
-                  key: ObjectKey(selectedRun),
-                  session: selectedRun!,
-                )
-              : Container(),
-        ),
+        if (view == DeveloperConsoleView.logs)
+          SizedBox(width: developerConsoleControlGap),
+        if (view == DeveloperConsoleView.logs)
+          SizedBox(
+            width: 190,
+            child: ShadSelect<LogLevelFilter>(
+              initialValue: logLevelFilter,
+              onChanged: (value) {
+                setState(() {
+                  logLevelFilter = value ?? LogLevelFilter.all;
+                });
+              },
+              selectedOptionBuilder: (context, value) =>
+                  Text(logLevelFilterLabel(value)),
+              options: [
+                for (final level in LogLevelFilter.values)
+                  ShadOption<LogLevelFilter>(
+                    value: level,
+                    child: Text(logLevelFilterLabel(level)),
+                  ),
+              ],
+            ),
+          ),
+        if (view == DeveloperConsoleView.logs)
+          SizedBox(width: developerConsoleControlGap),
+        if (view == DeveloperConsoleView.logs)
+          ShadButton.ghost(
+            leading: Icon(LucideIcons.trash, size: 16),
+            onPressed: () {
+              setState(() {
+                widget.events.removeWhere(
+                  (event) => event is RoomLogEvent && event.name == "otel.log",
+                );
+                logClearSignal++;
+              });
+            },
+            child: Text("Clear Logs"),
+          ),
       ],
+    );
+  }
+
+  Widget _buildTerminalSidebar() {
+    return ListView(
+      padding: EdgeInsets.symmetric(
+        horizontal: developerConsoleHorizontalPadding,
+        vertical: 8,
+      ),
+      children: [
+        Row(
+          children: [
+            ShadButton.secondary(
+              leading: adding
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(),
+                    )
+                  : Icon(LucideIcons.plus),
+              onPressed: adding
+                  ? null
+                  : () async {
+                      final launchOptions = await promptForImageTerminal(
+                        context,
+                        initialCommand: "bash -l",
+                        initialRoomMounts: [
+                          RoomStorageMountSpec(path: "/data", readOnly: false),
+                        ],
+                      );
+                      if (launchOptions == null) {
+                        return;
+                      }
+                      setState(() {
+                        adding = true;
+                      });
+                      try {
+                        final roomToken = widget.room.protocol.token;
+                        if (roomToken == null || roomToken.isEmpty) {
+                          throw StateError("room token unavailable");
+                        }
+                        final containerId = await widget.room.containers.run(
+                          image: widget.shellImage,
+                          command: "sleep infinity",
+                          mounts: launchOptions.mounts,
+                          writableRootFs: true,
+                          env: {
+                            "OPENAI_API_KEY": roomToken,
+                            "MESHAGENT_TOKEN": roomToken,
+                          },
+                          private: true,
+                        );
+
+                        final run = widget.room.containers.exec(
+                          containerId: containerId,
+                          command: launchOptions.command,
+                          tty: true,
+                        );
+                        if (!mounted) {
+                          return;
+                        }
+                        setState(() {
+                          runs.add(run);
+                          selectedRun = run;
+                        });
+                      } on RoomServerException catch (err) {
+                        showShadDialog(
+                          context: context,
+                          builder: (context) => ShadDialog.alert(
+                            title: Text("Unable to run container"),
+                            description: Text("$err"),
+                          ),
+                        );
+                      } finally {
+                        if (mounted) {
+                          setState(() {
+                            adding = false;
+                          });
+                        }
+                      }
+                    },
+              child: Text("Add Terminal"),
+            ),
+            Spacer(),
+          ],
+        ),
+        for (final run in runs)
+          Row(
+            spacing: 8,
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child:
+                      (selectedRun == run
+                      ? ShadButton.secondary
+                      : ShadButton.ghost)(
+                        onPressed: () {
+                          setState(() {
+                            selectedRun = run;
+                          });
+                        },
+                        child: Text(
+                          run.command,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: ShadButton.ghost(
+                  onPressed: () {
+                    setState(() {
+                      run.stop();
+                      runs.remove(run);
+                    });
+                  },
+                  child: Icon(LucideIcons.x),
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  Widget terminalView(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final sidebar = _buildTerminalSidebar();
+        final terminal = selectedRun != null
+            ? ContainerTerminal(
+                key: ObjectKey(selectedRun),
+                session: selectedRun!,
+              )
+            : Container();
+
+        final sidebarWidth = min(320.0, max(260.0, constraints.maxWidth * .28));
+        return Row(
+          children: [
+            SizedBox(width: sidebarWidth, child: sidebar),
+            VerticalDivider(width: 1),
+            Expanded(child: terminal),
+          ],
+        );
+      },
     );
   }
 
@@ -428,133 +583,24 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
         crossAxisAlignment: .stretch,
         children: [
           Padding(
-            padding: EdgeInsets.only(top: 20, bottom: 8, left: 20),
-            child: Row(
-              mainAxisSize: .max,
-              crossAxisAlignment: .start,
-              children: [
-                SizedBox(
-                  width: 300,
-                  child: ShadTabs<DeveloperConsoleView>(
-                    value: view,
-                    onChanged: _setView,
-                    tabs: [
-                      ShadTab(value: .logs, child: _tabLabel("Logs", .logs)),
-                      ShadTab(
-                        value: .traces,
-                        child: _tabLabel("Traces", .traces),
-                      ),
-                      ShadTab(
-                        value: .metrics,
-                        child: _tabLabel("Metrics", .metrics),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(width: 15),
-                SizedBox(
-                  width: 560,
-                  child: ShadTabs<DeveloperConsoleView>(
-                    value: view,
-                    onChanged: _setView,
-                    tabs: [
-                      ShadTab(
-                        value: .containers,
-                        child: _tabLabel("Containers", .containers),
-                      ),
-                      ShadTab(
-                        value: .images,
-                        child: _tabLabel("Images", .images),
-                      ),
-                      ShadTab(
-                        value: .services,
-                        child: _tabLabel("Services", .services),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(width: 15),
-                SizedBox(
-                  width: 100,
-                  child: ShadTabs<DeveloperConsoleView>(
-                    value: view,
-                    onChanged: _setView,
-                    tabs: [
-                      ShadTab(
-                        value: .terminal,
-                        child: _tabLabel("Terminal", .terminal),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            padding: EdgeInsets.fromLTRB(
+              developerConsoleHorizontalPadding,
+              20,
+              developerConsoleHorizontalPadding,
+              8,
             ),
+            child: _buildViewSwitcher(),
           ),
           if (view == DeveloperConsoleView.logs ||
               view == DeveloperConsoleView.traces)
             Padding(
-              padding: EdgeInsets.only(bottom: 10, left: 20, right: 20),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 420,
-                    child: ShadInput(
-                      placeholder: Text(
-                        view == DeveloperConsoleView.traces
-                            ? "Filter traces..."
-                            : "Filter...",
-                      ),
-                      onChanged: (value) {
-                        setState(() {
-                          if (view == DeveloperConsoleView.traces) {
-                            traceFilter = value;
-                          } else {
-                            logFilter = value;
-                          }
-                        });
-                      },
-                    ),
-                  ),
-                  if (view == DeveloperConsoleView.logs) SizedBox(width: 10),
-                  if (view == DeveloperConsoleView.logs)
-                    SizedBox(
-                      width: 180,
-                      child: ShadSelect<LogLevelFilter>(
-                        initialValue: logLevelFilter,
-                        onChanged: (value) {
-                          setState(() {
-                            logLevelFilter = value ?? LogLevelFilter.all;
-                          });
-                        },
-                        selectedOptionBuilder: (context, value) =>
-                            Text(logLevelFilterLabel(value)),
-                        options: [
-                          for (final level in LogLevelFilter.values)
-                            ShadOption<LogLevelFilter>(
-                              value: level,
-                              child: Text(logLevelFilterLabel(level)),
-                            ),
-                        ],
-                      ),
-                    ),
-                  if (view == DeveloperConsoleView.logs) SizedBox(width: 10),
-                  if (view == DeveloperConsoleView.logs)
-                    ShadButton.ghost(
-                      leading: Icon(LucideIcons.trash, size: 16),
-                      onPressed: () {
-                        setState(() {
-                          widget.events.removeWhere(
-                            (event) =>
-                                event is RoomLogEvent &&
-                                event.name == "otel.log",
-                          );
-                          logClearSignal++;
-                        });
-                      },
-                      child: Text("Clear Logs"),
-                    ),
-                ],
+              padding: EdgeInsets.fromLTRB(
+                developerConsoleHorizontalPadding,
+                0,
+                developerConsoleHorizontalPadding,
+                10,
               ),
+              child: _buildFilterControls(),
             ),
           Expanded(
             child: switch (view) {
@@ -585,7 +631,9 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                 crossAxisAlignment: .stretch,
                 children: [
                   Padding(
-                    padding: EdgeInsetsGeometry.symmetric(horizontal: 20),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: developerConsoleHorizontalPadding,
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,

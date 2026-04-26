@@ -5,11 +5,98 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:meshagent/meshagent.dart';
 import 'package:meshagent_flutter_shadcn/ui/ui.dart';
+import './developer_console_layout.dart';
 import './ansi.dart';
 
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:flutter_solidart/flutter_solidart.dart';
+
+Widget _tableIconButtonChild({
+  required Widget icon,
+  required String tooltip,
+  required VoidCallback? onPressed,
+}) {
+  return ShadTooltip(
+    builder: (context) => Text(tooltip),
+    child: ShadIconButton.ghost(
+      icon: icon,
+      iconSize: 18,
+      width: developerIconButtonSize,
+      height: developerIconButtonSize,
+      padding: EdgeInsets.zero,
+      decoration: const ShadDecoration(shape: BoxShape.circle),
+      enabled: onPressed != null,
+      onPressed: onPressed,
+    ),
+  );
+}
+
+Widget _tableIconButton({
+  required IconData icon,
+  required String tooltip,
+  required VoidCallback? onPressed,
+}) {
+  return _tableIconButtonChild(
+    icon: Icon(icon),
+    tooltip: tooltip,
+    onPressed: onPressed,
+  );
+}
+
+Widget _developerDataTable({
+  required List<DataColumn> Function(double width) columns,
+  required List<DataRow> Function(double width) rows,
+}) {
+  return LayoutBuilder(
+    builder: (context, constraints) {
+      final width = constraints.maxWidth;
+      return SingleChildScrollView(
+        scrollDirection: Axis.vertical,
+        child: SizedBox(
+          width: width,
+          child: SelectionArea(
+            child: DataTable(
+              horizontalMargin: developerTableHorizontalMargin,
+              columnSpacing: developerTableColumnSpacing,
+              columns: columns(width),
+              rows: rows(width),
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+DataColumn _iconColumn() {
+  return const DataColumn(
+    columnWidth: FixedColumnWidth(developerIconColumnWidth),
+    label: SizedBox.shrink(),
+  );
+}
+
+DataColumn _actionsColumn() {
+  return const DataColumn(label: SizedBox.shrink());
+}
+
+DataColumn _fixedTextColumn(String label, double width) {
+  return DataColumn(
+    columnWidth: FixedColumnWidth(width),
+    label: _ellipsisText(label),
+  );
+}
+
+DataColumn _flexTextColumn(String label, {double flex = 1}) {
+  return DataColumn(
+    columnWidth: FlexColumnWidth(flex),
+    label: _ellipsisText(label),
+  );
+}
+
+Widget _ellipsisText(String text) {
+  return Text(text, maxLines: 1, overflow: TextOverflow.ellipsis);
+}
 
 class TerminalLaunchOptions {
   const TerminalLaunchOptions({required this.command, this.mounts});
@@ -546,163 +633,149 @@ class _ImageTableState extends State<ImageTable> {
           return const Center(child: Text('No images found'));
         }
 
-        return SingleChildScrollView(
-          scrollDirection: Axis.vertical,
-          child: DataTable(
-            columns: const [
-              DataColumn(label: Text("")),
-              DataColumn(label: Text('Reference')),
-              DataColumn(label: Text('Updated')),
-              DataColumn(label: Text('')),
-            ],
-            rows: [
-              for (final img in images)
-                DataRow(
-                  cells: [
-                    DataCell(
-                      IconButton(
-                        icon: const Icon(LucideIcons.play),
-                        tooltip: 'Run',
-                        onPressed: () async {
-                          try {
-                            final launchOptions = await promptForImageTerminal(
-                              context,
-                            );
-                            if (launchOptions == null) {
-                              return;
-                            }
-
-                            final containerId = await widget.client.containers
-                                .run(
-                                  command: "sleep infinity",
-                                  image: _displayImageRef(img),
-                                  writableRootFs: true,
-                                  mounts: launchOptions.mounts,
-                                );
-
-                            final tty = widget.client.containers.exec(
-                              containerId: containerId,
-                              tty: true,
-                              command: launchOptions.command,
-                            );
-
-                            if (!mounted) return;
-
-                            widget.onRun(tty);
-
-                            ShadToaster.of(context).show(
-                              const ShadToast(
-                                description: Text('Starting container'),
-                              ),
-                            );
-                            _reload();
-                          } catch (e) {
-                            ShadToaster.of(context).show(
-                              ShadToast(
-                                description: Text(
-                                  'Unable to start container: $e',
-                                ),
-                              ),
-                            );
+        return _developerDataTable(
+          columns: (_) => [
+            _iconColumn(),
+            _flexTextColumn('Reference'),
+            _fixedTextColumn('Updated', 130),
+            _actionsColumn(),
+          ],
+          rows: (_) => [
+            for (final img in images)
+              DataRow(
+                cells: [
+                  DataCell(
+                    _tableIconButton(
+                      icon: LucideIcons.play,
+                      tooltip: 'Run',
+                      onPressed: () async {
+                        try {
+                          final launchOptions = await promptForImageTerminal(
+                            context,
+                          );
+                          if (launchOptions == null) {
+                            return;
                           }
-                        },
-                      ),
-                    ),
-                    DataCell(
-                      Row(
-                        children: [
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: SelectableText(
-                              _displayImageRef(img),
-                              style: const TextStyle(),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    DataCell(Text(_formatImageTimeAgo(img.updatedAt))),
-                    DataCell(
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(LucideIcons.info),
-                            tooltip: 'Inspect',
-                            onPressed: () {
-                              showShadSheet(
-                                side: ShadSheetSide.right,
-                                context: context,
-                                builder: (context) {
-                                  final sheetWidth =
-                                      MediaQuery.sizeOf(context).width * 0.94;
-                                  return ShadSheet(
-                                    title: Text(_displayImageRef(img)),
-                                    constraints: BoxConstraints(
-                                      minWidth: sheetWidth,
-                                      maxWidth: sheetWidth,
-                                    ),
-                                    child: _ImageDetailsSheet(
-                                      client: widget.client,
-                                      imageId: img.id,
-                                    ),
-                                  );
-                                },
-                              );
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(LucideIcons.delete),
-                            tooltip: 'Delete',
-                            onPressed: () async {
-                              final confirm =
-                                  await showShadDialog<bool>(
-                                    context: context,
-                                    builder: (ctx) => ShadDialog(
-                                      title: const Text('Delete image?'),
-                                      child: Text(_displayImageRef(img)),
-                                      actions: [
-                                        ShadButton.secondary(
-                                          onPressed: () =>
-                                              Navigator.pop(ctx, false),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        ShadButton.destructive(
-                                          onPressed: () =>
-                                              Navigator.pop(ctx, true),
-                                          child: const Text('Delete'),
-                                        ),
-                                      ],
-                                    ),
-                                  ) ??
-                                  false;
-                              if (!confirm) return;
 
-                              try {
-                                await widget.client.containers.deleteImage(
-                                  image: _displayImageRef(img),
-                                );
-                                ShadToaster.of(context).show(
-                                  const ShadToast(
-                                    description: Text('Deleted image'),
-                                  ),
-                                );
-                                _reload();
-                              } catch (e) {
-                                ShadToaster.of(context).show(
-                                  ShadToast(
-                                    description: Text('Delete failed: $e'),
-                                  ),
-                                );
-                              }
-                            },
-                          ),
-                        ],
-                      ),
+                          final containerId = await widget.client.containers
+                              .run(
+                                command: "sleep infinity",
+                                image: _displayImageRef(img),
+                                writableRootFs: true,
+                                mounts: launchOptions.mounts,
+                              );
+
+                          final tty = widget.client.containers.exec(
+                            containerId: containerId,
+                            tty: true,
+                            command: launchOptions.command,
+                          );
+
+                          if (!mounted) return;
+
+                          widget.onRun(tty);
+
+                          ShadToaster.of(context).show(
+                            const ShadToast(
+                              description: Text('Starting container'),
+                            ),
+                          );
+                          _reload();
+                        } catch (e) {
+                          ShadToaster.of(context).show(
+                            ShadToast(
+                              description: Text(
+                                'Unable to start container: $e',
+                              ),
+                            ),
+                          );
+                        }
+                      },
                     ),
-                  ],
-                ),
-            ],
-          ),
+                  ),
+                  DataCell(_ellipsisText(_displayImageRef(img))),
+                  DataCell(Text(_formatImageTimeAgo(img.updatedAt))),
+                  DataCell(
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _tableIconButton(
+                          icon: LucideIcons.info,
+                          tooltip: 'Inspect',
+                          onPressed: () {
+                            showShadSheet(
+                              side: ShadSheetSide.right,
+                              context: context,
+                              builder: (context) {
+                                final sheetWidth =
+                                    MediaQuery.sizeOf(context).width * 0.94;
+                                return ShadSheet(
+                                  title: Text(_displayImageRef(img)),
+                                  constraints: BoxConstraints(
+                                    minWidth: sheetWidth,
+                                    maxWidth: sheetWidth,
+                                  ),
+                                  child: _ImageDetailsSheet(
+                                    client: widget.client,
+                                    imageId: img.id,
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                        _tableIconButton(
+                          icon: LucideIcons.delete,
+                          tooltip: 'Delete',
+                          onPressed: () async {
+                            final confirm =
+                                await showShadDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => ShadDialog(
+                                    title: const Text('Delete image?'),
+                                    child: Text(_displayImageRef(img)),
+                                    actions: [
+                                      ShadButton.secondary(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      ShadButton.destructive(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, true),
+                                        child: const Text('Delete'),
+                                      ),
+                                    ],
+                                  ),
+                                ) ??
+                                false;
+                            if (!confirm) return;
+
+                            try {
+                              await widget.client.containers.deleteImage(
+                                image: _displayImageRef(img),
+                              );
+                              ShadToaster.of(context).show(
+                                const ShadToast(
+                                  description: Text('Deleted image'),
+                                ),
+                              );
+                              _reload();
+                            } catch (e) {
+                              ShadToaster.of(context).show(
+                                ShadToast(
+                                  description: Text('Delete failed: $e'),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+          ],
         );
       },
     );
@@ -1038,292 +1111,245 @@ class _ContainerTableState extends State<ContainerTable> {
             Expanded(
               child: containersResource.state.value!.isEmpty
                   ? const Center(child: Text('No running containers'))
-                  : LayoutBuilder(
-                      builder: (context, constraints) => SingleChildScrollView(
-                        scrollDirection: Axis.vertical,
-                        child: DataTable(
-                          columns: const [
-                            DataColumn(label: Text("")),
-                            DataColumn(label: Text('Status')),
-                            DataColumn(label: Text('Name')),
-                            DataColumn(label: Text('Image')),
-                            DataColumn(label: Text('Ports')),
-                            DataColumn(label: Text('Started by')),
-                            DataColumn(label: Text('')), // stop‑button column
-                          ],
-                          rows: [
-                            for (final c in containersResource.state.value!)
-                              DataRow(
-                                cells: [
-                                  DataCell(
-                                    IconButton(
-                                      icon: const Icon(LucideIcons.play),
-                                      tooltip: 'Run',
+                  : _developerDataTable(
+                      columns: (_) => [
+                        _iconColumn(),
+                        _fixedTextColumn('Status', 100),
+                        _fixedTextColumn('Name', 140),
+                        _flexTextColumn('Image'),
+                        _fixedTextColumn('Ports', 100),
+                        _fixedTextColumn('Started by', 100),
+                        _actionsColumn(),
+                      ],
+                      rows: (_) => [
+                        for (final c in containersResource.state.value!)
+                          DataRow(
+                            cells: [
+                              DataCell(
+                                _tableIconButton(
+                                  icon: LucideIcons.play,
+                                  tooltip: 'Run',
+                                  onPressed: () async {
+                                    try {
+                                      final launchOptions =
+                                          await promptForContainerTerminal(
+                                            context,
+                                          );
+                                      if (launchOptions == null) {
+                                        return;
+                                      }
+                                      final tty = widget.client.containers.exec(
+                                        containerId: c.id,
+                                        tty: true,
+                                        command: launchOptions.command,
+                                      );
+
+                                      if (!mounted) return;
+
+                                      widget.onRun(tty);
+
+                                      ShadToaster.of(context).show(
+                                        const ShadToast(
+                                          description: Text(
+                                            'Starting container',
+                                          ),
+                                        ),
+                                      );
+                                    } catch (e) {
+                                      ShadToaster.of(context).show(
+                                        ShadToast(
+                                          description: Text(
+                                            'Unable to start container: $e',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
+                              ),
+                              DataCell(_ellipsisText(c.state)),
+                              DataCell(
+                                Row(
+                                  spacing: 8,
+                                  children: [
+                                    if (c.private)
+                                      Icon(LucideIcons.lock, size: 16),
+                                    Expanded(
+                                      child: _ellipsisText(
+                                        c.name?.isNotEmpty == true
+                                            ? c.name!
+                                            : c.id.substring(0, 12),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              DataCell(_ellipsisText(c.image)),
+                              DataCell(
+                                _ellipsisText(
+                                  c.ports.isEmpty ? '' : c.ports.join(', '),
+                                ),
+                              ),
+                              DataCell(_ellipsisText(c.startedBy.name)),
+                              DataCell(
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    _tableIconButton(
+                                      icon: LucideIcons.logs,
+                                      tooltip: 'Logs',
+                                      onPressed: () {
+                                        showShadDialog(
+                                          context: context,
+                                          builder: (context) => ShadDialog(
+                                            scrollable: false,
+                                            constraints: BoxConstraints(
+                                              minWidth: 1024,
+                                              minHeight: 600,
+                                              maxHeight: 700,
+                                              maxWidth: 1024,
+                                            ),
+                                            title: Text('Container logs'),
+                                            child: ContainerLogs(
+                                              client: widget.client,
+                                              containerId: c.id,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    _tableIconButton(
+                                      icon: LucideIcons.circleStop,
+                                      tooltip: 'Stop',
+                                      onPressed: c.state == 'EXITED'
+                                          ? null
+                                          : () async {
+                                              final confirm =
+                                                  await showShadDialog<bool>(
+                                                    context: context,
+                                                    builder: (ctx) => ShadDialog(
+                                                      title: const Text(
+                                                        'Stop container?',
+                                                      ),
+                                                      child: Text(
+                                                        'Container ${c.id.substring(0, 12)}',
+                                                      ),
+                                                      actions: [
+                                                        ShadButton.secondary(
+                                                          onPressed: () =>
+                                                              Navigator.pop(
+                                                                ctx,
+                                                                false,
+                                                              ),
+                                                          child: const Text(
+                                                            'Cancel',
+                                                          ),
+                                                        ),
+                                                        ShadButton.destructive(
+                                                          onPressed: () =>
+                                                              Navigator.pop(
+                                                                ctx,
+                                                                true,
+                                                              ),
+                                                          child: const Text(
+                                                            'Stop',
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ) ??
+                                                  false;
+                                              if (!confirm) return;
+
+                                              try {
+                                                await widget.client.containers
+                                                    .stop(containerId: c.id);
+                                                ShadToaster.of(context).show(
+                                                  const ShadToast(
+                                                    description: Text(
+                                                      'Container stopped',
+                                                    ),
+                                                  ),
+                                                );
+                                                containersResource.refresh();
+                                              } catch (e) {
+                                                ShadToaster.of(context).show(
+                                                  ShadToast(
+                                                    description: Text(
+                                                      'Stop failed: $e',
+                                                    ),
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                    ),
+                                    _tableIconButton(
+                                      icon: LucideIcons.trash,
+                                      tooltip: 'Delete',
                                       onPressed: () async {
+                                        final confirm =
+                                            await showShadDialog<bool>(
+                                              context: context,
+                                              builder: (ctx) => ShadDialog(
+                                                title: const Text(
+                                                  'Delete container?',
+                                                ),
+                                                child: Text(
+                                                  'Container ${c.id.substring(0, 12)}',
+                                                ),
+                                                actions: [
+                                                  ShadButton.secondary(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                          ctx,
+                                                          false,
+                                                        ),
+                                                    child: const Text('Cancel'),
+                                                  ),
+                                                  ShadButton.destructive(
+                                                    onPressed: () =>
+                                                        Navigator.pop(
+                                                          ctx,
+                                                          true,
+                                                        ),
+                                                    child: const Text('Delete'),
+                                                  ),
+                                                ],
+                                              ),
+                                            ) ??
+                                            false;
+                                        if (!confirm) return;
+
                                         try {
-                                          final launchOptions =
-                                              await promptForContainerTerminal(
-                                                context,
-                                              );
-                                          if (launchOptions == null) {
-                                            return;
-                                          }
-                                          final tty = widget.client.containers
-                                              .exec(
+                                          await widget.client.containers
+                                              .deleteContainer(
                                                 containerId: c.id,
-                                                tty: true,
-                                                command: launchOptions.command,
                                               );
-
-                                          if (!mounted) return;
-
-                                          widget.onRun(tty);
-
                                           ShadToaster.of(context).show(
                                             const ShadToast(
                                               description: Text(
-                                                'Starting container',
+                                                'Container deleted',
                                               ),
                                             ),
                                           );
+                                          containersResource.refresh();
                                         } catch (e) {
                                           ShadToaster.of(context).show(
                                             ShadToast(
                                               description: Text(
-                                                'Unable to start container: $e',
+                                                'Delete failed: $e',
                                               ),
                                             ),
                                           );
                                         }
                                       },
                                     ),
-                                  ),
-
-                                  DataCell(Text(c.state)),
-                                  DataCell(
-                                    Row(
-                                      spacing: 8,
-                                      children: [
-                                        if (c.private)
-                                          Icon(LucideIcons.lock, size: 16),
-                                        Expanded(
-                                          child: Text(
-                                            c.name ?? "",
-                                            style: TextStyle(),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  DataCell(
-                                    ConstrainedBox(
-                                      constraints: BoxConstraints(
-                                        maxWidth: constraints.maxWidth * .75,
-                                      ),
-                                      child: Text(
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        [c.image].join(' '),
-                                        style: TextStyle(color: null),
-                                      ),
-                                    ),
-                                  ),
-                                  DataCell(
-                                    ConstrainedBox(
-                                      constraints: BoxConstraints(
-                                        maxWidth: constraints.maxWidth * .2,
-                                      ),
-                                      child: Text(
-                                        c.ports.isEmpty
-                                            ? ''
-                                            : c.ports.join(', '),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Text(c.startedBy.name, style: TextStyle()),
-                                  ),
-                                  DataCell(
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(LucideIcons.logs),
-                                          tooltip: "Logs",
-                                          onPressed: () {
-                                            showShadDialog(
-                                              context: context,
-                                              builder: (context) => ShadDialog(
-                                                scrollable: false,
-                                                constraints: BoxConstraints(
-                                                  minWidth: 1024,
-                                                  minHeight: 600,
-                                                  maxHeight: 700,
-                                                  maxWidth: 1024,
-                                                ),
-                                                title: Text("Container logs"),
-                                                child: ContainerLogs(
-                                                  client: widget.client,
-                                                  containerId: c.id,
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(
-                                            LucideIcons.circleStop,
-                                          ),
-                                          tooltip: 'Stop',
-                                          onPressed: c.state == "EXITED"
-                                              ? null
-                                              : () async {
-                                                  final confirm =
-                                                      await showShadDialog<
-                                                        bool
-                                                      >(
-                                                        context: context,
-                                                        builder: (ctx) => ShadDialog(
-                                                          title: const Text(
-                                                            'Stop container?',
-                                                          ),
-                                                          child: Text(
-                                                            'Container ${c.id.substring(0, 12)}',
-                                                          ),
-                                                          actions: [
-                                                            ShadButton.secondary(
-                                                              onPressed: () =>
-                                                                  Navigator.pop(
-                                                                    ctx,
-                                                                    false,
-                                                                  ),
-                                                              child: const Text(
-                                                                'Cancel',
-                                                              ),
-                                                            ),
-                                                            ShadButton.destructive(
-                                                              onPressed: () =>
-                                                                  Navigator.pop(
-                                                                    ctx,
-                                                                    true,
-                                                                  ),
-                                                              child: const Text(
-                                                                'Stop',
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ) ??
-                                                      false;
-                                                  if (!confirm) return;
-
-                                                  try {
-                                                    await widget
-                                                        .client
-                                                        .containers
-                                                        .stop(
-                                                          containerId: c.id,
-                                                        );
-                                                    ShadToaster.of(
-                                                      context,
-                                                    ).show(
-                                                      const ShadToast(
-                                                        description: Text(
-                                                          'Container stopped',
-                                                        ),
-                                                      ),
-                                                    );
-                                                    containersResource
-                                                        .refresh();
-                                                  } catch (e) {
-                                                    ShadToaster.of(
-                                                      context,
-                                                    ).show(
-                                                      ShadToast(
-                                                        description: Text(
-                                                          'Stop failed: $e',
-                                                        ),
-                                                      ),
-                                                    );
-                                                  }
-                                                },
-                                        ),
-
-                                        IconButton(
-                                          icon: const Icon(LucideIcons.trash),
-                                          tooltip: 'Delete',
-                                          onPressed: () async {
-                                            final confirm =
-                                                await showShadDialog<bool>(
-                                                  context: context,
-                                                  builder: (ctx) => ShadDialog(
-                                                    title: const Text(
-                                                      'Delete container?',
-                                                    ),
-                                                    child: Text(
-                                                      'Container ${c.id.substring(0, 12)}',
-                                                    ),
-                                                    actions: [
-                                                      ShadButton.secondary(
-                                                        onPressed: () =>
-                                                            Navigator.pop(
-                                                              ctx,
-                                                              false,
-                                                            ),
-                                                        child: const Text(
-                                                          'Cancel',
-                                                        ),
-                                                      ),
-                                                      ShadButton.destructive(
-                                                        onPressed: () =>
-                                                            Navigator.pop(
-                                                              ctx,
-                                                              true,
-                                                            ),
-                                                        child: const Text(
-                                                          'Delete',
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ) ??
-                                                false;
-                                            if (!confirm) return;
-
-                                            try {
-                                              await widget.client.containers
-                                                  .deleteContainer(
-                                                    containerId: c.id,
-                                                  );
-                                              ShadToaster.of(context).show(
-                                                const ShadToast(
-                                                  description: Text(
-                                                    'Container deleted',
-                                                  ),
-                                                ),
-                                              );
-                                              containersResource.refresh();
-                                            } catch (e) {
-                                              ShadToaster.of(context).show(
-                                                ShadToast(
-                                                  description: Text(
-                                                    'Delete failed: $e',
-                                                  ),
-                                                ),
-                                              );
-                                            }
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                          ],
-                        ),
-                      ),
+                            ],
+                          ),
+                      ],
                     ),
             ),
           ],
@@ -1424,192 +1450,181 @@ class _ServiceTableState extends State<ServiceTable> {
           return const Center(child: Text("No services configured"));
         }
 
-        return LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
-            scrollDirection: Axis.vertical,
-            child: DataTable(
-              columns: const [
-                DataColumn(label: Text("State")),
-                DataColumn(label: Text("Name")),
-                DataColumn(label: Text("Image")),
-                DataColumn(label: Text("Container")),
-                DataColumn(label: Text("Started")),
-                DataColumn(label: Text("Restart In")),
-                DataColumn(label: Text("Restarts")),
-                DataColumn(label: Text("")),
-              ],
-              rows: [
-                for (final service in services)
-                  () {
-                    final serviceId = service.id;
-                    final state = serviceId == null
-                        ? null
-                        : response.serviceStates[serviceId];
-                    final stateLabel = state?.state ?? "unknown";
-                    final showRestartSpinner =
-                        stateLabel == "restarting" || stateLabel == "scheduled";
-                    final containerId = state?.containerId;
-                    final containerSpec = service.container;
-                    final image = containerSpec?.image ?? "—";
-                    final canRestart =
-                        serviceId != null &&
-                        containerSpec != null &&
-                        containerSpec.onDemand != true;
-                    final isRestarting = stateLabel == "restarting";
-                    final isRestartInFlight =
-                        serviceId != null &&
-                        _restartInFlightServiceIds.contains(serviceId);
+        bool showContainer(double width) => width >= 820;
+        bool showStarted(double width) => width >= 940;
 
-                    return DataRow(
-                      cells: [
-                        DataCell(
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: showRestartSpinner
-                                    ? const CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      )
-                                    : null,
+        return _developerDataTable(
+          columns: (width) => [
+            _fixedTextColumn('State', 130),
+            _fixedTextColumn('Name', 130),
+            _flexTextColumn('Image'),
+            if (showContainer(width)) _fixedTextColumn('Container', 130),
+            if (showStarted(width)) _fixedTextColumn('Started', 180),
+            _fixedTextColumn('Restart In', 80),
+            _fixedTextColumn('Restarts', 70),
+            _actionsColumn(),
+          ],
+          rows: (width) {
+            return [
+              for (final service in services)
+                () {
+                  final serviceId = service.id;
+                  final state = serviceId == null
+                      ? null
+                      : response.serviceStates[serviceId];
+                  final stateLabel = state?.state ?? 'unknown';
+                  final showRestartSpinner =
+                      stateLabel == 'restarting' || stateLabel == 'scheduled';
+                  final containerId = state?.containerId;
+                  final containerSpec = service.container;
+                  final image = containerSpec?.image ?? '—';
+                  final canRestart =
+                      serviceId != null &&
+                      containerSpec != null &&
+                      containerSpec.onDemand != true;
+                  final isRestarting = stateLabel == 'restarting';
+                  final isRestartInFlight =
+                      serviceId != null &&
+                      _restartInFlightServiceIds.contains(serviceId);
+
+                  return DataRow(
+                    cells: [
+                      DataCell(
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: showRestartSpinner
+                                  ? const CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                stateLabel,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(width: 8),
-                              Text(stateLabel),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
+                      ),
+                      DataCell(_ellipsisText(service.metadata.name)),
+                      DataCell(_ellipsisText(image)),
+                      if (showContainer(width))
                         DataCell(
-                          ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: constraints.maxWidth * .2,
-                            ),
-                            child: Text(
-                              service.metadata.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: constraints.maxWidth * .3,
-                            ),
-                            child: Text(
-                              image,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          Text(
+                          _ellipsisText(
                             containerId == null
-                                ? "—"
+                                ? '—'
                                 : containerId.length > 12
                                 ? containerId.substring(0, 12)
                                 : containerId,
                           ),
                         ),
-                        DataCell(Text(_formatTimestamp(state?.startedAtTime))),
+                      if (showStarted(width))
                         DataCell(
-                          Text(_formatRestartIn(state?.restartScheduledAtTime)),
+                          _ellipsisText(_formatTimestamp(state?.startedAtTime)),
                         ),
-                        DataCell(Text("${state?.restartCount ?? 0}")),
-                        DataCell(
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: isRestartInFlight
-                                    ? const SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Icon(Icons.restart_alt),
-                                tooltip: "Restart",
-                                onPressed:
-                                    !canRestart ||
-                                        isRestarting ||
-                                        isRestartInFlight
-                                    ? null
-                                    : () async {
-                                        final id = serviceId;
-                                        setState(() {
-                                          _restartInFlightServiceIds.add(id);
-                                        });
-                                        try {
-                                          await widget.client.services.restart(
-                                            serviceId: id,
-                                          );
-                                          if (!mounted) return;
-                                          ShadToaster.of(context).show(
-                                            ShadToast(
-                                              description: Text(
-                                                "Restart requested for ${service.metadata.name}",
-                                              ),
-                                            ),
-                                          );
-                                          servicesResource.refresh();
-                                        } catch (e) {
-                                          if (!mounted) return;
-                                          ShadToaster.of(context).show(
-                                            ShadToast(
-                                              description: Text(
-                                                "Restart failed: $e",
-                                              ),
-                                            ),
-                                          );
-                                        } finally {
-                                          if (mounted) {
-                                            setState(() {
-                                              _restartInFlightServiceIds.remove(
-                                                id,
-                                              );
-                                            });
-                                          }
-                                        }
-                                      },
-                              ),
-                              IconButton(
-                                icon: const Icon(LucideIcons.logs),
-                                tooltip: "Logs",
-                                onPressed: containerId == null
-                                    ? null
-                                    : () {
-                                        showShadDialog(
-                                          context: context,
-                                          builder: (context) => ShadDialog(
-                                            scrollable: false,
-                                            constraints: BoxConstraints(
-                                              minWidth: 1024,
-                                              minHeight: 600,
-                                              maxHeight: 700,
-                                              maxWidth: 1024,
-                                            ),
-                                            title: Text("Service logs"),
-                                            child: ContainerLogs(
-                                              client: widget.client,
-                                              containerId: containerId,
+                      DataCell(
+                        _ellipsisText(
+                          _formatRestartIn(state?.restartScheduledAtTime),
+                        ),
+                      ),
+                      DataCell(Text('${state?.restartCount ?? 0}')),
+                      DataCell(
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _tableIconButtonChild(
+                              icon: isRestartInFlight
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.restart_alt),
+                              tooltip: 'Restart',
+                              onPressed:
+                                  !canRestart ||
+                                      isRestarting ||
+                                      isRestartInFlight
+                                  ? null
+                                  : () async {
+                                      final id = serviceId;
+                                      setState(() {
+                                        _restartInFlightServiceIds.add(id);
+                                      });
+                                      try {
+                                        await widget.client.services.restart(
+                                          serviceId: id,
+                                        );
+                                        if (!mounted) return;
+                                        ShadToaster.of(context).show(
+                                          ShadToast(
+                                            description: Text(
+                                              'Restart requested for ${service.metadata.name}',
                                             ),
                                           ),
                                         );
-                                      },
-                              ),
-                            ],
-                          ),
+                                        servicesResource.refresh();
+                                      } catch (e) {
+                                        if (!mounted) return;
+                                        ShadToaster.of(context).show(
+                                          ShadToast(
+                                            description: Text(
+                                              'Restart failed: $e',
+                                            ),
+                                          ),
+                                        );
+                                      } finally {
+                                        if (mounted) {
+                                          setState(() {
+                                            _restartInFlightServiceIds.remove(
+                                              id,
+                                            );
+                                          });
+                                        }
+                                      }
+                                    },
+                            ),
+                            _tableIconButton(
+                              icon: LucideIcons.logs,
+                              tooltip: 'Logs',
+                              onPressed: containerId == null
+                                  ? null
+                                  : () {
+                                      showShadDialog(
+                                        context: context,
+                                        builder: (context) => ShadDialog(
+                                          scrollable: false,
+                                          constraints: BoxConstraints(
+                                            minWidth: 1024,
+                                            minHeight: 600,
+                                            maxHeight: 700,
+                                            maxWidth: 1024,
+                                          ),
+                                          title: Text('Service logs'),
+                                          child: ContainerLogs(
+                                            client: widget.client,
+                                            containerId: containerId,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                            ),
+                          ],
                         ),
-                      ],
-                    );
-                  }(),
-              ],
-            ),
-          ),
+                      ),
+                    ],
+                  );
+                }(),
+            ];
+          },
         );
       },
     );
