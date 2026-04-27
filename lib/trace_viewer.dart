@@ -1213,7 +1213,11 @@ class _LiveTraceViewerState extends State<LiveTraceViewer> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(children: [TraceViewer(spans: _visibleSpans(), depth: 1)]);
+    return SelectionArea(
+      child: ListView(
+        children: [TraceViewer(spans: _visibleSpans(), depth: 1)],
+      ),
+    );
   }
 }
 
