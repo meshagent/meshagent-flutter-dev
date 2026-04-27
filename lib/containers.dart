@@ -11,6 +11,129 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:flutter_solidart/flutter_solidart.dart';
 
+bool _usesAdaptiveTextSelectionToolbar() {
+  if (kIsWeb) {
+    return false;
+  }
+
+  return switch (defaultTargetPlatform) {
+    TargetPlatform.iOS || TargetPlatform.android => true,
+    TargetPlatform.fuchsia ||
+    TargetPlatform.linux ||
+    TargetPlatform.macOS ||
+    TargetPlatform.windows => false,
+  };
+}
+
+Widget _adaptiveInputContextMenuBuilder(
+  BuildContext context,
+  EditableTextState editableTextState,
+) {
+  if (_usesAdaptiveTextSelectionToolbar()) {
+    return TextFieldTapRegion(
+      groupId: editableTextState.widget.groupId,
+      child: AdaptiveTextSelectionToolbar.editableText(
+        editableTextState: editableTextState,
+      ),
+    );
+  }
+
+  return ShadInputState.defaultContextMenuBuilder(context, editableTextState);
+}
+
+const double _flowDialogGroupGap = 12;
+const double _flowDialogInlineGap = 8;
+const double _flowDialogCompactMobileSectionGap = _flowDialogGroupGap * 3;
+const double _flowDialogCompactMobileTextGroupGap = _flowDialogGroupGap * 3;
+const double _flowDialogCompactMobileTextInlineGap = _flowDialogInlineGap * 2;
+const double _flowDialogCompactMobileFieldInset = 4;
+const double _flowDialogCompactMobileSelectInset = 8;
+
+bool _usesCompactMobileDialogFormLayout(BuildContext context) {
+  if (kIsWeb) {
+    return false;
+  }
+
+  final screenSize = MediaQuery.maybeOf(context)?.size;
+  if (screenSize == null) {
+    return false;
+  }
+
+  final isMobilePlatform = switch (defaultTargetPlatform) {
+    TargetPlatform.iOS || TargetPlatform.android => true,
+    TargetPlatform.fuchsia ||
+    TargetPlatform.linux ||
+    TargetPlatform.macOS ||
+    TargetPlatform.windows => false,
+  };
+
+  return isMobilePlatform && screenSize.shortestSide < 600;
+}
+
+TextStyle _flowDialogContentTitleStyle(BuildContext context) {
+  if (!_usesCompactMobileDialogFormLayout(context)) {
+    return _flowDialogDesktopHeadingStyle(context);
+  }
+
+  final theme = ShadTheme.of(context);
+  return GoogleFonts.inter(
+    textStyle: DefaultTextStyle.of(context).style,
+    color: theme.colorScheme.foreground,
+    fontWeight: FontWeight.w600,
+  );
+}
+
+TextStyle _flowDialogDesktopHeadingStyle(BuildContext context) {
+  final theme = ShadTheme.of(context);
+  return GoogleFonts.inter(
+    color: theme.colorScheme.foreground,
+    fontWeight: FontWeight.w600,
+    fontSize: 15,
+    height: 1.10,
+  );
+}
+
+TextStyle _flowDialogDesktopHelperStyle(BuildContext context) {
+  final theme = ShadTheme.of(context);
+  return GoogleFonts.inter(
+    color: theme.colorScheme.mutedForeground,
+    fontWeight: FontWeight.w400,
+    fontSize: 14,
+    height: 1.35,
+  );
+}
+
+TextStyle _flowDialogSecondaryTextStyle(BuildContext context) {
+  if (!_usesCompactMobileDialogFormLayout(context)) {
+    return _flowDialogDesktopHelperStyle(context);
+  }
+
+  final theme = ShadTheme.of(context);
+  return theme.textTheme.muted.copyWith(
+    color: theme.colorScheme.mutedForeground,
+  );
+}
+
+TextStyle _flowDialogInputLabelStyle(BuildContext context) {
+  if (_usesCompactMobileDialogFormLayout(context)) {
+    return _flowDialogContentTitleStyle(context);
+  }
+
+  return _flowDialogDesktopHeadingStyle(context);
+}
+
+String _capitalizeFirstWord(String value) {
+  final trimmed = value.trimLeft();
+  if (trimmed.isEmpty) {
+    return value;
+  }
+
+  final leadingWhitespaceLength = value.length - trimmed.length;
+  return value.substring(0, leadingWhitespaceLength) +
+      trimmed[0].toUpperCase() +
+      trimmed.substring(1);
+}
+
 class TerminalLaunchOptions {
   const TerminalLaunchOptions({required this.command, this.mounts});
 
@@ -1684,6 +1807,8 @@ class ServiceNameCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final contentTitleStyle = _flowDialogContentTitleStyle(context);
+    final secondaryTextStyle = _flowDialogSecondaryTextStyle(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1702,9 +1827,7 @@ class ServiceNameCard extends StatelessWidget {
               children: [
                 Text(
                   manifest.metadata.name,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: contentTitleStyle,
                   overflow: TextOverflow.ellipsis,
                 ),
                 if (manifest.metadata.description != null) ...[
@@ -1713,11 +1836,7 @@ class ServiceNameCard extends StatelessWidget {
                     manifest.metadata.description!,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.color?.withValues(alpha: 0.8),
-                    ),
+                    style: secondaryTextStyle,
                   ),
                 ],
               ],
@@ -1770,8 +1889,13 @@ class _ServiceInstallSummary {
 }
 
 class ServiceInfoCard extends StatelessWidget {
-  const ServiceInfoCard({super.key, required this.manifest});
+  const ServiceInfoCard({
+    super.key,
+    required this.manifest,
+    this.desktopContentGroupGap,
+  });
   final ServiceTemplateSpec manifest;
+  final double? desktopContentGroupGap;
 
   _ServiceInstallSummary _summarize(List<PortSpec> ports) {
     final keys = <String>{};
@@ -1814,9 +1938,18 @@ class ServiceInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelStyle = Theme.of(
-      context,
-    ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600);
+    final labelStyle = _flowDialogInputLabelStyle(context);
+    final secondaryTextStyle = _flowDialogSecondaryTextStyle(context);
+    final usesCompactMobileLayout = _usesCompactMobileDialogFormLayout(context);
+    final bulletTextStyle = usesCompactMobileLayout
+        ? secondaryTextStyle
+        : secondaryTextStyle.copyWith(height: 1.5);
+    final contentGroupGap = usesCompactMobileLayout
+        ? _flowDialogCompactMobileTextGroupGap
+        : (desktopContentGroupGap ?? _flowDialogGroupGap);
+    final contentInlineGap = usesCompactMobileLayout
+        ? _flowDialogCompactMobileTextInlineGap
+        : _flowDialogInlineGap;
     final summary = _summarize(manifest.ports);
     final showsInstallSummary =
         manifest.agents.isNotEmpty || summary.installsMcp;
@@ -1832,7 +1965,9 @@ class ServiceInfoCard extends StatelessWidget {
     ];
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: usesCompactMobileLayout ? 0 : 12,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
@@ -1840,35 +1975,44 @@ class ServiceInfoCard extends StatelessWidget {
           if (showsInstallSummary) ...[
             Text('This package will install:', style: labelStyle),
             Padding(
-              padding: EdgeInsets.only(left: 8, top: 8, bottom: 8),
+              padding: EdgeInsets.only(
+                left: usesCompactMobileLayout ? 0 : 8,
+                top: contentInlineGap,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   for (final a in manifest.agents) ...[
                     if (a.annotations["meshagent.agent.type"] == "ChatBot")
-                      Text("• A chatbot"),
+                      Text("• A chatbot", style: bulletTextStyle),
                     if (a.annotations["meshagent.agent.type"] == "Mailbot")
-                      Text("• A mailbot"),
+                      Text("• A mailbot", style: bulletTextStyle),
                     if (a.annotations["meshagent.agent.type"] == "VoiceBot")
-                      Text("• A voicebot"),
+                      Text("• A voicebot", style: bulletTextStyle),
                     if (a.annotations["meshagent.agent.type"] == "Shell")
-                      Text("• A terminal based agent"),
+                      Text("• A terminal based agent", style: bulletTextStyle),
                     if (a.annotations["meshagent.agent.widget"] != null)
-                      Text("• A custom interface"),
+                      Text("• A custom interface", style: bulletTextStyle),
                     if (a.annotations["meshagent.agent.dataset.schema"] != null)
-                      Text("• A custom dataset"),
+                      Text("• A custom dataset", style: bulletTextStyle),
+                    if (a.annotations["meshagent.agent.database.schema"] !=
+                        null)
+                      Text("• A custom database", style: bulletTextStyle),
                     if (a.annotations["meshagent.agent.schedule"] != null)
-                      Text("• Scheduled tasks"),
+                      Text("• Scheduled tasks", style: bulletTextStyle),
                   ],
-                  if (summary.installsMcp) Text("• An MCP connector"),
+                  if (summary.installsMcp)
+                    Text("• An MCP connector", style: bulletTextStyle),
                   if (summary.installsMcp && hasFilteredAgentName)
                     Text(
                       "• This MCP connector will only be installed for agent '$filteredAgentName'",
+                      style: bulletTextStyle,
                     ),
                 ],
               ),
             ),
+            if (permissionLines.isNotEmpty) SizedBox(height: contentGroupGap),
           ],
           if (permissionLines.isNotEmpty) ...[
             Text(
@@ -1876,10 +2020,17 @@ class ServiceInfoCard extends StatelessWidget {
               style: labelStyle,
             ),
             Padding(
-              padding: EdgeInsets.only(left: 8, top: 8),
-              child: Text(
-                permissionLines.map((line) => "• $line").join("\n"),
-                style: TextStyle(height: 1.75),
+              padding: EdgeInsets.only(
+                left: usesCompactMobileLayout ? 0 : 8,
+                top: contentInlineGap,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final line in permissionLines)
+                    Text("• $line", style: bulletTextStyle),
+                ],
               ),
             ),
           ],
@@ -1898,6 +2049,11 @@ class ConfigureServiceTemplate extends StatefulWidget {
     this.routeDomains = const [],
     this.customActions = const [],
     this.header = const [],
+    this.showActionRow = true,
+    this.desktopHorizontalPadding = 12,
+    this.desktopSectionSpacing = 10,
+    this.desktopHeaderBottomSpacing,
+    this.onFormStateChanged,
   });
 
   final ServiceTemplateSpec spec;
@@ -1905,6 +2061,12 @@ class ConfigureServiceTemplate extends StatefulWidget {
   final List<String> routeDomains;
   final List<Widget> customActions;
   final List<Widget> header;
+  final bool showActionRow;
+  final double desktopHorizontalPadding;
+  final double desktopSectionSpacing;
+  final double? desktopHeaderBottomSpacing;
+  final void Function(Map<String, String> vars, bool Function() validate)?
+  onFormStateChanged;
 
   final List<Widget> Function(
     BuildContext,
@@ -2015,9 +2177,9 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
   String _variableTitle(ServiceTemplateVariable variable) {
     final title = variable.title?.trim();
     if (title == null || title.isEmpty) {
-      return variable.name;
+      return _capitalizeFirstWord(variable.name);
     }
-    return title;
+    return _capitalizeFirstWord(title);
   }
 
   bool _validate() {
@@ -2027,96 +2189,182 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
         false;
   }
 
+  String? _variableDescription(ServiceTemplateVariable variable) {
+    final description = variable.description;
+    if (description == null || description.trim().isEmpty) {
+      return null;
+    }
+
+    return _capitalizeFirstWord(description);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final labelStyle = Theme.of(
-      context,
-    ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600);
+    final usesCompactMobileLayout = _usesCompactMobileDialogFormLayout(context);
+    final theme = ShadTheme.of(context);
+    final labelStyle = _flowDialogInputLabelStyle(context);
+    final contentTitleStyle = _flowDialogContentTitleStyle(context);
+    final secondaryTextStyle = _flowDialogSecondaryTextStyle(context);
+    final compactMobileInputPadding = usesCompactMobileLayout
+        ? const EdgeInsets.only(left: 12, top: 0, bottom: 0, right: 0)
+        : const EdgeInsets.only(left: 8, top: 0, bottom: 0, right: 0);
+    final suffixTextStyle = theme.textTheme.small.copyWith(
+      color: theme.colorScheme.mutedForeground,
+      fontSize: usesCompactMobileLayout ? 14 : null,
+    );
     final mailDomain = const String.fromEnvironment("MESHAGENT_MAIL_DOMAIN");
     final emailSuffix = mailDomain.isEmpty ? "" : "@$mailDomain";
     final routeDomains = _routeDomains;
+    void dismissFocusedField(PointerDownEvent _) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
 
-    return ShadForm(
-      key: _formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 16,
-        children: [
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              children: [
-                ...widget.header,
-                if (widget.spec.variables?.isNotEmpty ?? false) ...[
-                  for (final v
-                      in widget.spec.variables ?? <ServiceTemplateVariable>[])
-                    switch (v.type) {
-                      "email" => Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ShadInputFormField(
-                            id: v.name,
-                            constraints: BoxConstraints(maxWidth: 400),
-                            padding: EdgeInsets.only(
-                              left: 8,
-                              top: 0,
-                              bottom: 0,
-                              right: 0,
-                            ),
-                            label: Text(
+    Widget wrapCompactMobileField(Widget child) {
+      child = SizedBox(width: double.infinity, child: child);
+
+      if (!usesCompactMobileLayout) {
+        return child;
+      }
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(
+          vertical: _flowDialogCompactMobileFieldInset,
+        ),
+        child: child,
+      );
+    }
+
+    Widget wrapCompactMobileSelectField(Widget child) {
+      child = SizedBox(width: double.infinity, child: child);
+
+      if (!usesCompactMobileLayout) {
+        return child;
+      }
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(
+          vertical: _flowDialogCompactMobileSelectInset,
+        ),
+        child: child,
+      );
+    }
+
+    Widget wrapDesktopFieldGroup(Widget child) {
+      if (usesCompactMobileLayout) {
+        return child;
+      }
+
+      return Padding(padding: const EdgeInsets.only(bottom: 7), child: child);
+    }
+
+    final actions = widget.actionsBuilder(context, _vars, _validate);
+    widget.onFormStateChanged?.call(
+      Map<String, String>.unmodifiable(_vars),
+      _validate,
+    );
+    final headerFields = List<Widget>.of(widget.header);
+    final desktopHeaderBottomSpacing =
+        widget.desktopHeaderBottomSpacing ?? widget.desktopSectionSpacing;
+    final contentFields =
+        [
+              if (widget.spec.variables?.isNotEmpty ?? false) ...[
+                for (final v
+                    in widget.spec.variables ?? <ServiceTemplateVariable>[])
+                  switch (v.type) {
+                    "email" => Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (usesCompactMobileLayout)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: Text(
                               '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
                               style: labelStyle,
                             ),
-                            obscureText: v.obscure,
-                            initialValue: emailSuffix.isEmpty
-                                ? (_vars[v.name] ?? '')
-                                : (_vars[v.name] ?? '').replaceAll(
-                                    emailSuffix,
-                                    '',
-                                  ),
-                            onChanged: (txt) => setState(() {
-                              final normalized = txt.trim();
-                              if (normalized.isEmpty) {
-                                _vars[v.name] = "";
-                              } else if (emailSuffix.isEmpty) {
-                                _vars[v.name] = normalized;
-                              } else {
-                                _vars[v.name] = "$normalized$emailSuffix";
-                              }
-                            }),
-                            trailing: emailSuffix.isEmpty
-                                ? null
-                                : Container(
-                                    color: ShadTheme.of(
-                                      context,
-                                    ).colorScheme.muted,
-                                    padding: EdgeInsets.all(8),
-                                    child: Text(emailSuffix),
-                                  ),
                           ),
-                          if (v.description != null)
-                            Padding(
-                              padding: EdgeInsets.symmetric(vertical: 7),
-                              child: Text(v.description ?? ''),
+                        wrapCompactMobileField(
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: usesCompactMobileLayout ? 4 : 4,
                             ),
-                        ],
-                      ),
-                      "route" => Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (routeDomains.isEmpty)
+                            child: ShadInputFormField(
+                              id: v.name,
+                              onPressedOutside: dismissFocusedField,
+                              contextMenuBuilder:
+                                  _adaptiveInputContextMenuBuilder,
+                              groupId: v.name,
+                              constraints: null,
+                              padding: compactMobileInputPadding,
+                              label: usesCompactMobileLayout
+                                  ? null
+                                  : Text(
+                                      '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
+                                      style: labelStyle,
+                                    ),
+                              obscureText: v.obscure,
+                              initialValue: emailSuffix.isEmpty
+                                  ? (_vars[v.name] ?? '')
+                                  : (_vars[v.name] ?? '').replaceAll(
+                                      emailSuffix,
+                                      '',
+                                    ),
+                              onChanged: (txt) => setState(() {
+                                final normalized = txt.trim();
+                                if (normalized.isEmpty) {
+                                  _vars[v.name] = "";
+                                } else if (emailSuffix.isEmpty) {
+                                  _vars[v.name] = normalized;
+                                } else {
+                                  _vars[v.name] = "$normalized$emailSuffix";
+                                }
+                              }),
+                              trailing: emailSuffix.isEmpty
+                                  ? null
+                                  : Container(
+                                      color: theme.colorScheme.muted,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 8,
+                                      ),
+                                      child: Text(
+                                        emailSuffix,
+                                        style: suffixTextStyle,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ),
+                        if (_variableDescription(v) case final description?)
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: 7),
+                            child: Text(description, style: secondaryTextStyle),
+                          ),
+                      ],
+                    ),
+                    "route" => Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (routeDomains.isEmpty)
+                          wrapCompactMobileField(
                             ShadInputFormField(
                               id: "${v.name}_domain",
+                              onPressedOutside: dismissFocusedField,
+                              contextMenuBuilder:
+                                  _adaptiveInputContextMenuBuilder,
+                              groupId: "${v.name}_domain",
                               label: Text(
                                 '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
                                 style: labelStyle,
                               ),
                               initialValue: _vars[v.name] ?? "",
-                              description: v.description == null
+                              description: _variableDescription(v) == null
                                   ? null
-                                  : Text(v.description ?? ''),
+                                  : Text(
+                                      _variableDescription(v)!,
+                                      style: secondaryTextStyle,
+                                    ),
                               validator: v.optional
                                   ? null
                                   : (txt) => (txt.trim().isEmpty)
@@ -2124,139 +2372,317 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                                         : null,
                               onChanged: (txt) =>
                                   setState(() => _vars[v.name] = txt.trim()),
-                            )
-                          else ...[
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
+                            ),
+                          )
+                        else ...[
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              if (usesCompactMobileLayout)
+                                Expanded(
+                                  child: wrapCompactMobileField(
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                      ),
+                                      child: ShadInputFormField(
+                                        onPressedOutside: dismissFocusedField,
+                                        contextMenuBuilder:
+                                            _adaptiveInputContextMenuBuilder,
+                                        groupId: "${v.name}_subdomain",
+                                        constraints: null,
+                                        padding: compactMobileInputPadding,
+                                        gap: 0,
+                                        id: "${v.name}_subdomain",
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        label: Text(
+                                          '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
+                                          style: labelStyle,
+                                        ),
+                                        initialValue:
+                                            _routeSubdomains[v.name] ?? "",
+                                        validator: v.optional
+                                            ? null
+                                            : (txt) => (txt.trim().isEmpty)
+                                                  ? '${_variableTitle(v)} is required'
+                                                  : null,
+                                        onChanged: (txt) {
+                                          setState(() {
+                                            _routeSubdomains[v.name] = txt
+                                                .trim();
+                                            _syncRouteValue(v.name);
+                                          });
+                                        },
+                                        trailing: Container(
+                                          color: theme.colorScheme.muted,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 8,
+                                          ),
+                                          child: Text(
+                                            ".${routeDomains.first}",
+                                            style: suffixTextStyle,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else
+                                wrapCompactMobileField(
+                                  ShadInputFormField(
+                                    onPressedOutside: dismissFocusedField,
+                                    contextMenuBuilder:
+                                        _adaptiveInputContextMenuBuilder,
+                                    groupId: "${v.name}_subdomain",
+                                    constraints: null,
+                                    padding: compactMobileInputPadding,
+                                    gap: 0,
+                                    id: "${v.name}_subdomain",
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    label: Text(
+                                      '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
+                                      style: labelStyle,
+                                    ),
+                                    initialValue:
+                                        _routeSubdomains[v.name] ?? "",
+                                    validator: v.optional
+                                        ? null
+                                        : (txt) => (txt.trim().isEmpty)
+                                              ? '${_variableTitle(v)} is required'
+                                              : null,
+                                    onChanged: (txt) {
+                                      setState(() {
+                                        _routeSubdomains[v.name] = txt.trim();
+                                        _syncRouteValue(v.name);
+                                      });
+                                    },
+                                    trailing: Container(
+                                      color: theme.colorScheme.muted,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 8,
+                                      ),
+                                      child: Text(
+                                        ".${routeDomains.first}",
+                                        style: suffixTextStyle,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          if (_variableDescription(v) case final description?)
+                            Padding(
+                              padding: EdgeInsets.symmetric(vertical: 7),
+                              child: Text(
+                                description,
+                                style: secondaryTextStyle,
+                              ),
+                            ),
+                        ],
+                      ],
+                    ),
+                    _ =>
+                      v.enumValues == null
+                          ? wrapDesktopFieldGroup(
+                              wrapCompactMobileField(
                                 ShadInputFormField(
-                                  constraints: BoxConstraints(maxWidth: 300),
-                                  padding: EdgeInsets.only(left: 8),
-                                  gap: 0,
-                                  id: "${v.name}_subdomain",
-                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  id: v.name,
+                                  onPressedOutside: dismissFocusedField,
+                                  contextMenuBuilder:
+                                      _adaptiveInputContextMenuBuilder,
+                                  groupId: v.name,
                                   label: Text(
                                     '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
                                     style: labelStyle,
                                   ),
-                                  initialValue: _routeSubdomains[v.name] ?? "",
-                                  validator: v.optional
+                                  obscureText: v.obscure,
+                                  initialValue: _vars[v.name] ?? '',
+                                  description: _variableDescription(v) == null
                                       ? null
-                                      : (txt) => (txt.trim().isEmpty)
-                                            ? '${_variableTitle(v)} is required'
-                                            : null,
-                                  onChanged: (txt) {
-                                    setState(() {
-                                      _routeSubdomains[v.name] = txt.trim();
-                                      _syncRouteValue(v.name);
-                                    });
+                                      : Text(
+                                          _variableDescription(v)!,
+                                          style: secondaryTextStyle,
+                                        ),
+                                  validator: (txt) {
+                                    final val = txt.trim();
+                                    if (v.optional) return null;
+                                    final msg = val.isEmpty
+                                        ? '${_variableTitle(v)} is required'
+                                        : null;
+                                    return msg;
                                   },
-                                  trailing: Container(
-                                    color: ShadTheme.of(
-                                      context,
-                                    ).colorScheme.muted,
-                                    padding: EdgeInsets.all(8),
-                                    child: Text(".${routeDomains.first}"),
+                                  onChanged: (txt) => setState(
+                                    () => _vars[v.name] = txt.trim(),
                                   ),
                                 ),
-                              ],
+                              ),
+                            )
+                          : wrapDesktopFieldGroup(
+                              wrapCompactMobileSelectField(
+                                LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final fieldWidth = constraints.maxWidth;
+                                    return ShadSelectFormField<String>(
+                                      label: Text(
+                                        _variableTitle(v),
+                                        style: labelStyle,
+                                      ),
+                                      id: v.name,
+                                      initialValue:
+                                          v.enumValues!.contains(_vars[v.name])
+                                          ? _vars[v.name]
+                                          : v.enumValues!.first,
+                                      minWidth: fieldWidth,
+                                      maxWidth: fieldWidth,
+                                      selectedOptionBuilder: (context, value) =>
+                                          Text(
+                                            value,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                      options: [
+                                        ...v.enumValues!.map(
+                                          (val) => ShadOption<String>(
+                                            value: val,
+                                            child: Text(val),
+                                          ),
+                                        ),
+                                      ],
+                                      description:
+                                          _variableDescription(v) == null
+                                          ? null
+                                          : Text(
+                                              _variableDescription(v)!,
+                                              style: secondaryTextStyle,
+                                            ),
+                                      validator: v.optional
+                                          ? null
+                                          : (txt) {
+                                              final msg =
+                                                  (txt?.trim().isEmpty ==
+                                                          true ||
+                                                      txt == null)
+                                                  ? '${_variableTitle(v)} is required'
+                                                  : null;
+                                              return msg;
+                                            },
+                                      onChanged: (txt) =>
+                                          setState(() => _vars[v.name] = txt!),
+                                    );
+                                  },
+                                ),
+                              ),
                             ),
-                            if (v.description != null)
-                              Padding(
-                                padding: EdgeInsets.symmetric(vertical: 7),
-                                child: Text(v.description ?? ''),
-                              ),
-                          ],
-                        ],
-                      ),
-                      _ =>
-                        v.enumValues == null
-                            ? ShadInputFormField(
-                                id: v.name,
-                                label: Text(
-                                  '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
-                                  style: labelStyle,
-                                ),
-                                obscureText: v.obscure,
-                                initialValue: _vars[v.name] ?? '',
-                                description: v.description == null
-                                    ? null
-                                    : Text(v.description ?? ''),
-                                validator: (txt) {
-                                  final val = txt.trim();
-                                  if (v.optional) return null;
-                                  final msg = val.isEmpty
-                                      ? '${_variableTitle(v)} is required'
-                                      : null;
-                                  return msg;
-                                },
-                                onChanged: (txt) =>
-                                    setState(() => _vars[v.name] = txt.trim()),
-                              )
-                            : ShadSelectFormField<String>(
-                                label: Text(
-                                  _variableTitle(v),
-                                  style: labelStyle,
-                                ),
-                                id: v.name,
-                                initialValue:
-                                    v.enumValues!.contains(_vars[v.name])
-                                    ? _vars[v.name]
-                                    : v.enumValues!.first,
-                                selectedOptionBuilder: (context, value) =>
-                                    Text(value),
-                                options: [
-                                  ...v.enumValues!.map(
-                                    (val) => ShadOption<String>(
-                                      value: val,
-                                      child: Text(val),
-                                    ),
-                                  ),
-                                ],
-                                description: v.description == null
-                                    ? null
-                                    : Text(v.description ?? ''),
-                                validator: v.optional
-                                    ? null
-                                    : (txt) {
-                                        final msg =
-                                            (txt?.trim().isEmpty == true ||
-                                                txt == null)
-                                            ? '${_variableTitle(v)} is required'
-                                            : null;
-                                        return msg;
-                                      },
-                                onChanged: (txt) =>
-                                    setState(() => _vars[v.name] = txt!),
-                              ),
-                    },
+                  },
+              ],
+              if (widget.spec.container != null) ...[
+                if (widget.spec.container!.storage != null &&
+                    widget.spec.container!.storage?.room != null) ...[
+                  for (final rs in widget.spec.container!.storage!.room!)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          rs.subpath == null
+                              ? "Mounts entire room's storage to"
+                              : "Mounts only ${rs.subpath} to",
+                          style: contentTitleStyle,
+                        ),
+                        const SizedBox(height: _flowDialogInlineGap),
+                        Text(
+                          rs.path,
+                          style: _flowDialogSecondaryTextStyle(context),
+                        ),
+                      ],
+                    ),
                 ],
-                if (widget.spec.container != null) ...[
-                  if (widget.spec.container!.storage != null &&
-                      widget.spec.container!.storage?.room != null) ...[
-                    for (final rs in widget.spec.container!.storage!.room!) ...[
-                      Text(
-                        rs.subpath == null
-                            ? "Mounts entire room's storage to"
-                            : "Mounts only ${rs.subpath} to",
-                        style: labelStyle,
-                      ),
-                      Text(rs.path),
-                    ],
-                  ],
-                ],
-              ].map((x) => Container(margin: EdgeInsets.only(bottom: 10), child: x)).toList(),
-            ),
-          ),
-          Row(
-            spacing: 8,
+              ],
+            ]
+            .map(
+              (x) => Container(
+                margin: EdgeInsets.only(
+                  bottom: usesCompactMobileLayout
+                      ? _flowDialogCompactMobileSectionGap
+                      : widget.desktopSectionSpacing,
+                ),
+                child: x,
+              ),
+            )
+            .toList();
+
+    final formFields = usesCompactMobileLayout
+        ? <Widget>[
+            if (headerFields.isNotEmpty)
+              const SizedBox(height: _flowDialogCompactMobileSectionGap),
+            ...headerFields,
+            if (headerFields.isNotEmpty && contentFields.isNotEmpty)
+              const SizedBox(height: _flowDialogCompactMobileSectionGap),
+            ...contentFields,
+          ]
+        : <Widget>[
+            for (var i = 0; i < headerFields.length; i++)
+              Container(
+                margin: EdgeInsets.only(
+                  bottom: i == headerFields.length - 1
+                      ? 0
+                      : widget.desktopSectionSpacing,
+                ),
+                child: headerFields[i],
+              ),
+            if (headerFields.isNotEmpty && contentFields.isNotEmpty)
+              SizedBox(height: desktopHeaderBottomSpacing),
+            ...contentFields,
+          ];
+
+    return ShadForm(
+      key: _formKey,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final hasBoundedHeight = constraints.maxHeight.isFinite;
+
+          return Column(
+            mainAxisSize: hasBoundedHeight
+                ? MainAxisSize.max
+                : MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: 16,
             children: [
-              ...widget.customActions,
-              Spacer(),
-              ...widget.actionsBuilder(context, _vars, _validate),
+              if (hasBoundedHeight)
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: usesCompactMobileLayout
+                          ? 0
+                          : widget.desktopHorizontalPadding,
+                    ),
+                    children: formFields,
+                  ),
+                )
+              else
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: usesCompactMobileLayout
+                        ? 0
+                        : widget.desktopHorizontalPadding,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: formFields,
+                  ),
+                ),
+              if (widget.showActionRow)
+                Row(
+                  spacing: 8,
+                  children: [...widget.customActions, Spacer(), ...actions],
+                ),
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
