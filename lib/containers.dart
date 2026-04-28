@@ -170,6 +170,8 @@ Widget _tableIconButton({
 Widget _developerDataTable({
   required List<DataColumn> Function(double width) columns,
   required List<DataRow> Function(double width) rows,
+  ValueChanged<bool?>? onSelectAll,
+  bool showCheckboxColumn = true,
 }) {
   return LayoutBuilder(
     builder: (context, constraints) {
@@ -183,7 +185,9 @@ Widget _developerDataTable({
               horizontalMargin: developerTableHorizontalMargin,
               columnSpacing: developerTableColumnSpacing,
               columns: columns(width),
+              onSelectAll: onSelectAll,
               rows: rows(width),
+              showCheckboxColumn: showCheckboxColumn,
             ),
           ),
         ),
@@ -691,6 +695,9 @@ class ImageTable extends StatefulWidget {
 
 class _ImageTableState extends State<ImageTable> {
   late Future<List<ContainerImage>> _imagesFuture;
+  List<ContainerImage> _images = const [];
+  final Set<String> _selectedImageIds = <String>{};
+  bool _isDeletingImages = false;
 
   String _displayImageRef(ContainerImage image) {
     if (image.preferredRef != null && image.preferredRef!.isNotEmpty) {
@@ -707,11 +714,18 @@ class _ImageTableState extends State<ImageTable> {
     return images;
   }
 
+  Future<List<ContainerImage>> _loadImages() {
+    return widget.client.containers.listImages().then((images) {
+      _images = _sortImages(images);
+      return _images;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     _timer = Timer.periodic(Duration(seconds: 1), _onTick);
-    _imagesFuture = widget.client.containers.listImages().then(_sortImages);
+    _imagesFuture = _loadImages();
   }
 
   late Timer _timer;
@@ -720,7 +734,8 @@ class _ImageTableState extends State<ImageTable> {
     widget.client.containers.listImages().then((images) {
       if (mounted) {
         setState(() {
-          _imagesFuture = SynchronousFuture(_sortImages(images));
+          _images = _sortImages(images);
+          _imagesFuture = SynchronousFuture(_images);
         });
       }
     });
@@ -732,11 +747,122 @@ class _ImageTableState extends State<ImageTable> {
     _timer.cancel();
   }
 
-  /// Force a re‑query after an image is removed
   Future<void> _reload() async {
     setState(() {
-      _imagesFuture = widget.client.containers.listImages().then(_sortImages);
+      _imagesFuture = _loadImages();
     });
+  }
+
+  List<ContainerImage> _selectedImages(List<ContainerImage> images) {
+    return [
+      for (final image in images)
+        if (_selectedImageIds.contains(image.id)) image,
+    ];
+  }
+
+  Future<bool> _confirmDeleteImages(List<ContainerImage> images) async {
+    final imageCount = images.length;
+    final preview = images.take(5).map(_displayImageRef).join('\n');
+    final remainingCount = imageCount - 5;
+    final body = remainingCount > 0
+        ? '$preview\n...and $remainingCount more'
+        : preview;
+
+    return await showShadDialog<bool>(
+          context: context,
+          builder: (ctx) => ShadDialog(
+            title: Text(imageCount == 1 ? 'Delete image?' : 'Delete images?'),
+            child: Text(body),
+            actions: [
+              ShadButton.secondary(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              ShadButton.destructive(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(imageCount == 1 ? 'Delete' : 'Delete all'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<void> _deleteImages(List<ContainerImage> images) async {
+    if (images.isEmpty || _isDeletingImages) {
+      return;
+    }
+
+    final confirm = await _confirmDeleteImages(images);
+    if (!confirm || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isDeletingImages = true;
+    });
+
+    var deletedCount = 0;
+    var failedCount = 0;
+    Object? firstError;
+    final deletedImageIds = <String>[];
+
+    try {
+      for (final image in images) {
+        try {
+          await widget.client.containers.deleteImage(
+            image: _displayImageRef(image),
+          );
+          deletedCount += 1;
+          deletedImageIds.add(image.id);
+        } catch (e) {
+          failedCount += 1;
+          firstError ??= e;
+        }
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _selectedImageIds.removeAll(deletedImageIds);
+        if (deletedImageIds.isNotEmpty) {
+          final deletedImageIdSet = deletedImageIds.toSet();
+          _images = [
+            for (final image in _images)
+              if (!deletedImageIdSet.contains(image.id)) image,
+          ];
+          _imagesFuture = SynchronousFuture(_images);
+        }
+      });
+
+      if (failedCount == 0) {
+        ShadToaster.of(context).show(
+          ShadToast(
+            description: Text(
+              deletedCount == 1
+                  ? 'Deleted image'
+                  : 'Deleted $deletedCount images',
+            ),
+          ),
+        );
+      } else {
+        ShadToaster.of(context).show(
+          ShadToast(
+            description: Text(
+              'Deleted $deletedCount images; failed to delete $failedCount: $firstError',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeletingImages = false;
+        });
+      }
+    }
   }
 
   @override
@@ -756,148 +882,181 @@ class _ImageTableState extends State<ImageTable> {
           return const Center(child: Text('No images found'));
         }
 
-        return _developerDataTable(
-          columns: (_) => [
-            _iconColumn(),
-            _flexTextColumn('Reference'),
-            _fixedTextColumn('Updated', 130),
-            _actionsColumn(),
-          ],
-          rows: (_) => [
-            for (final img in images)
-              DataRow(
-                cells: [
-                  DataCell(
-                    _tableIconButton(
-                      icon: LucideIcons.play,
-                      tooltip: 'Run',
-                      onPressed: () async {
-                        try {
-                          final launchOptions = await promptForImageTerminal(
-                            context,
-                          );
-                          if (launchOptions == null) {
-                            return;
-                          }
+        final visibleImageIds = images.map((image) => image.id).toSet();
+        final selectedImages = _selectedImages(images);
+        final selectedCount = selectedImages.length;
 
-                          final containerId = await widget.client.containers
-                              .run(
-                                command: "sleep infinity",
-                                image: _displayImageRef(img),
-                                writableRootFs: true,
-                                mounts: launchOptions.mounts,
-                              );
-
-                          final tty = widget.client.containers.exec(
-                            containerId: containerId,
-                            tty: true,
-                            command: launchOptions.command,
-                          );
-
-                          if (!mounted) return;
-
-                          widget.onRun(tty);
-
-                          ShadToaster.of(context).show(
-                            const ShadToast(
-                              description: Text('Starting container'),
-                            ),
-                          );
-                          _reload();
-                        } catch (e) {
-                          ShadToaster.of(context).show(
-                            ShadToast(
-                              description: Text(
-                                'Unable to start container: $e',
-                              ),
-                            ),
-                          );
-                        }
-                      },
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (selectedCount > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  developerTableHorizontalMargin,
+                  0,
+                  developerTableHorizontalMargin,
+                  8,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        selectedCount == 1
+                            ? '1 image selected'
+                            : '$selectedCount images selected',
+                      ),
                     ),
-                  ),
-                  DataCell(_ellipsisText(_displayImageRef(img))),
-                  DataCell(Text(_formatImageTimeAgo(img.updatedAt))),
-                  DataCell(
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _tableIconButton(
-                          icon: LucideIcons.info,
-                          tooltip: 'Inspect',
-                          onPressed: () {
-                            showShadSheet(
-                              side: ShadSheetSide.right,
-                              context: context,
-                              builder: (context) {
-                                final sheetWidth =
-                                    MediaQuery.sizeOf(context).width * 0.94;
-                                return ShadSheet(
-                                  title: Text(_displayImageRef(img)),
-                                  constraints: BoxConstraints(
-                                    minWidth: sheetWidth,
-                                    maxWidth: sheetWidth,
-                                  ),
-                                  child: _ImageDetailsSheet(
-                                    client: widget.client,
-                                    imageId: img.id,
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                        _tableIconButton(
-                          icon: LucideIcons.delete,
-                          tooltip: 'Delete',
-                          onPressed: () async {
-                            final confirm =
-                                await showShadDialog<bool>(
-                                  context: context,
-                                  builder: (ctx) => ShadDialog(
-                                    title: const Text('Delete image?'),
-                                    child: Text(_displayImageRef(img)),
-                                    actions: [
-                                      ShadButton.secondary(
-                                        onPressed: () =>
-                                            Navigator.pop(ctx, false),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      ShadButton.destructive(
-                                        onPressed: () =>
-                                            Navigator.pop(ctx, true),
-                                        child: const Text('Delete'),
-                                      ),
-                                    ],
-                                  ),
-                                ) ??
-                                false;
-                            if (!confirm) return;
+                    ShadButton.destructive(
+                      enabled: !_isDeletingImages,
+                      leading: const Icon(LucideIcons.delete),
+                      onPressed: () => _deleteImages(selectedImages),
+                      child: Text(
+                        _isDeletingImages ? 'Deleting...' : 'Delete selected',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: _developerDataTable(
+                onSelectAll: (selected) {
+                  setState(() {
+                    if (selected ?? false) {
+                      _selectedImageIds.addAll(visibleImageIds);
+                    } else {
+                      _selectedImageIds.removeAll(visibleImageIds);
+                    }
+                  });
+                },
+                columns: (_) => [
+                  _iconColumn(),
+                  _flexTextColumn('Reference'),
+                  _fixedTextColumn('Updated', 130),
+                  _actionsColumn(),
+                ],
+                rows: (_) => [
+                  for (final img in images)
+                    DataRow(
+                      selected: _selectedImageIds.contains(img.id),
+                      onSelectChanged: _isDeletingImages
+                          ? null
+                          : (selected) {
+                              setState(() {
+                                if (selected ?? false) {
+                                  _selectedImageIds.add(img.id);
+                                } else {
+                                  _selectedImageIds.remove(img.id);
+                                }
+                              });
+                            },
+                      cells: [
+                        DataCell(
+                          _tableIconButton(
+                            icon: LucideIcons.play,
+                            tooltip: 'Run',
+                            onPressed: _isDeletingImages
+                                ? null
+                                : () async {
+                                    try {
+                                      final launchOptions =
+                                          await promptForImageTerminal(context);
+                                      if (launchOptions == null) {
+                                        return;
+                                      }
 
-                            try {
-                              await widget.client.containers.deleteImage(
-                                image: _displayImageRef(img),
-                              );
-                              ShadToaster.of(context).show(
-                                const ShadToast(
-                                  description: Text('Deleted image'),
-                                ),
-                              );
-                              _reload();
-                            } catch (e) {
-                              ShadToaster.of(context).show(
-                                ShadToast(
-                                  description: Text('Delete failed: $e'),
-                                ),
-                              );
-                            }
-                          },
+                                      final containerId = await widget
+                                          .client
+                                          .containers
+                                          .run(
+                                            command: "sleep infinity",
+                                            image: _displayImageRef(img),
+                                            writableRootFs: true,
+                                            mounts: launchOptions.mounts,
+                                          );
+
+                                      final tty = widget.client.containers.exec(
+                                        containerId: containerId,
+                                        tty: true,
+                                        command: launchOptions.command,
+                                      );
+
+                                      if (!mounted) return;
+
+                                      widget.onRun(tty);
+
+                                      ShadToaster.of(context).show(
+                                        const ShadToast(
+                                          description: Text(
+                                            'Starting container',
+                                          ),
+                                        ),
+                                      );
+                                      _reload();
+                                    } catch (e) {
+                                      ShadToaster.of(context).show(
+                                        ShadToast(
+                                          description: Text(
+                                            'Unable to start container: $e',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                          ),
+                        ),
+                        DataCell(_ellipsisText(_displayImageRef(img))),
+                        DataCell(Text(_formatImageTimeAgo(img.updatedAt))),
+                        DataCell(
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _tableIconButton(
+                                icon: LucideIcons.info,
+                                tooltip: 'Inspect',
+                                onPressed: _isDeletingImages
+                                    ? null
+                                    : () {
+                                        showShadSheet(
+                                          side: ShadSheetSide.right,
+                                          context: context,
+                                          builder: (context) {
+                                            final sheetWidth =
+                                                MediaQuery.sizeOf(
+                                                  context,
+                                                ).width *
+                                                0.94;
+                                            return ShadSheet(
+                                              title: Text(
+                                                _displayImageRef(img),
+                                              ),
+                                              constraints: BoxConstraints(
+                                                minWidth: sheetWidth,
+                                                maxWidth: sheetWidth,
+                                              ),
+                                              child: _ImageDetailsSheet(
+                                                client: widget.client,
+                                                imageId: img.id,
+                                              ),
+                                            );
+                                          },
+                                        );
+                                      },
+                              ),
+                              _tableIconButton(
+                                icon: LucideIcons.delete,
+                                tooltip: 'Delete',
+                                onPressed: _isDeletingImages
+                                    ? null
+                                    : () => _deleteImages([img]),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
                 ],
               ),
+            ),
           ],
         );
       },
