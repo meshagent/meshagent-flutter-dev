@@ -207,6 +207,13 @@ DataColumn _actionsColumn() {
   return const DataColumn(label: SizedBox.shrink());
 }
 
+DataColumn _checkboxColumn(Widget checkbox) {
+  return DataColumn(
+    columnWidth: const FixedColumnWidth(40),
+    label: Center(child: checkbox),
+  );
+}
+
 DataColumn _fixedTextColumn(String label, double width) {
   return DataColumn(
     columnWidth: FixedColumnWidth(width),
@@ -223,6 +230,28 @@ DataColumn _flexTextColumn(String label, {double flex = 1}) {
 
 Widget _ellipsisText(String text) {
   return Text(text, maxLines: 1, overflow: TextOverflow.ellipsis);
+}
+
+Widget _tableCheckbox(
+  BuildContext context, {
+  required bool value,
+  required ValueChanged<bool?>? onChanged,
+}) {
+  final checkboxForeground = ShadTheme.of(
+    context,
+  ).colorScheme.primaryForeground;
+  return ShadCheckbox(
+    value: value,
+    icon: value
+        ? Icon(
+            LucideIcons.check,
+            size: 14,
+            weight: 3,
+            color: checkboxForeground,
+          )
+        : null,
+    onChanged: onChanged,
+  );
 }
 
 class TerminalLaunchOptions {
@@ -709,6 +738,24 @@ class _ImageTableState extends State<ImageTable> {
     return image.id;
   }
 
+  bool _imageIsPrivate(ContainerImage image) {
+    return image.labels['meshagent.private'] == 'true';
+  }
+
+  String? _imageStartedByName(ContainerImage image) {
+    final participantName = image.labels['participant.name'];
+    if (participantName != null && participantName.isNotEmpty) {
+      return participantName;
+    }
+
+    final participantId = image.labels['participant.id'];
+    if (participantId != null && participantId.isNotEmpty) {
+      return participantId;
+    }
+
+    return null;
+  }
+
   List<ContainerImage> _sortImages(List<ContainerImage> images) {
     images.sort((a, b) => _displayImageRef(a).compareTo(_displayImageRef(b)));
     return images;
@@ -885,6 +932,16 @@ class _ImageTableState extends State<ImageTable> {
         final visibleImageIds = images.map((image) => image.id).toSet();
         final selectedImages = _selectedImages(images);
         final selectedCount = selectedImages.length;
+        final selectedVisibleCount = images
+            .where((image) => _selectedImageIds.contains(image.id))
+            .length;
+        final allVisibleSelected =
+            images.isNotEmpty && selectedVisibleCount == images.length;
+        final localParticipantNameValue = widget.client.localParticipant
+            ?.getAttribute("name");
+        final localParticipantName = localParticipantNameValue is String
+            ? localParticipantNameValue
+            : null;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -892,9 +949,9 @@ class _ImageTableState extends State<ImageTable> {
             if (selectedCount > 0)
               Padding(
                 padding: const EdgeInsets.fromLTRB(
-                  developerTableHorizontalMargin,
+                  developerConsoleHorizontalPadding,
                   0,
-                  developerTableHorizontalMargin,
+                  developerConsoleHorizontalPadding,
                   8,
                 ),
                 child: Row(
@@ -919,16 +976,25 @@ class _ImageTableState extends State<ImageTable> {
               ),
             Expanded(
               child: _developerDataTable(
-                onSelectAll: (selected) {
-                  setState(() {
-                    if (selected ?? false) {
-                      _selectedImageIds.addAll(visibleImageIds);
-                    } else {
-                      _selectedImageIds.removeAll(visibleImageIds);
-                    }
-                  });
-                },
+                showCheckboxColumn: false,
                 columns: (_) => [
+                  _checkboxColumn(
+                    _tableCheckbox(
+                      context,
+                      value: allVisibleSelected,
+                      onChanged: _isDeletingImages
+                          ? null
+                          : (selected) {
+                              setState(() {
+                                if (selected ?? false) {
+                                  _selectedImageIds.addAll(visibleImageIds);
+                                } else {
+                                  _selectedImageIds.removeAll(visibleImageIds);
+                                }
+                              });
+                            },
+                    ),
+                  ),
                   _iconColumn(),
                   _flexTextColumn('Reference'),
                   _fixedTextColumn('Updated', 130),
@@ -936,124 +1002,149 @@ class _ImageTableState extends State<ImageTable> {
                 ],
                 rows: (_) => [
                   for (final img in images)
-                    DataRow(
-                      selected: _selectedImageIds.contains(img.id),
-                      onSelectChanged: _isDeletingImages
-                          ? null
-                          : (selected) {
-                              setState(() {
-                                if (selected ?? false) {
-                                  _selectedImageIds.add(img.id);
-                                } else {
-                                  _selectedImageIds.remove(img.id);
-                                }
-                              });
-                            },
-                      cells: [
-                        DataCell(
-                          _tableIconButton(
-                            icon: LucideIcons.play,
-                            tooltip: 'Run',
-                            onPressed: _isDeletingImages
-                                ? null
-                                : () async {
-                                    try {
-                                      final launchOptions =
-                                          await promptForImageTerminal(context);
-                                      if (launchOptions == null) {
-                                        return;
-                                      }
-
-                                      final containerId = await widget
-                                          .client
-                                          .containers
-                                          .run(
-                                            command: "sleep infinity",
-                                            image: _displayImageRef(img),
-                                            writableRootFs: true,
-                                            mounts: launchOptions.mounts,
-                                          );
-
-                                      final tty = widget.client.containers.exec(
-                                        containerId: containerId,
-                                        tty: true,
-                                        command: launchOptions.command,
-                                      );
-
-                                      if (!mounted) return;
-
-                                      widget.onRun(tty);
-
-                                      ShadToaster.of(context).show(
-                                        const ShadToast(
-                                          description: Text(
-                                            'Starting container',
-                                          ),
-                                        ),
-                                      );
-                                      _reload();
-                                    } catch (e) {
-                                      ShadToaster.of(context).show(
-                                        ShadToast(
-                                          description: Text(
-                                            'Unable to start container: $e',
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  },
-                          ),
-                        ),
-                        DataCell(_ellipsisText(_displayImageRef(img))),
-                        DataCell(Text(_formatImageTimeAgo(img.updatedAt))),
-                        DataCell(
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _tableIconButton(
-                                icon: LucideIcons.info,
-                                tooltip: 'Inspect',
-                                onPressed: _isDeletingImages
+                    () {
+                      final isSelected = _selectedImageIds.contains(img.id);
+                      final privateImageStartedByAnotherUser =
+                          _imageIsPrivate(img) &&
+                          _imageStartedByName(img) != localParticipantName;
+                      return DataRow(
+                        selected: isSelected,
+                        cells: [
+                          DataCell(
+                            Center(
+                              child: _tableCheckbox(
+                                context,
+                                value: isSelected,
+                                onChanged: _isDeletingImages
                                     ? null
-                                    : () {
-                                        showShadSheet(
-                                          side: ShadSheetSide.right,
-                                          context: context,
-                                          builder: (context) {
-                                            final sheetWidth =
-                                                MediaQuery.sizeOf(
-                                                  context,
-                                                ).width *
-                                                0.94;
-                                            return ShadSheet(
-                                              title: Text(
-                                                _displayImageRef(img),
-                                              ),
-                                              constraints: BoxConstraints(
-                                                minWidth: sheetWidth,
-                                                maxWidth: sheetWidth,
-                                              ),
-                                              child: _ImageDetailsSheet(
-                                                client: widget.client,
-                                                imageId: img.id,
-                                              ),
-                                            );
-                                          },
-                                        );
+                                    : (selected) {
+                                        setState(() {
+                                          if (selected ?? false) {
+                                            _selectedImageIds.add(img.id);
+                                          } else {
+                                            _selectedImageIds.remove(img.id);
+                                          }
+                                        });
                                       },
                               ),
-                              _tableIconButton(
-                                icon: LucideIcons.delete,
-                                tooltip: 'Delete',
-                                onPressed: _isDeletingImages
-                                    ? null
-                                    : () => _deleteImages([img]),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                          DataCell(
+                            privateImageStartedByAnotherUser
+                                ? const SizedBox.shrink()
+                                : _tableIconButton(
+                                    icon: LucideIcons.play,
+                                    tooltip: 'Run',
+                                    onPressed: _isDeletingImages
+                                        ? null
+                                        : () async {
+                                            try {
+                                              final launchOptions =
+                                                  await promptForImageTerminal(
+                                                    context,
+                                                  );
+                                              if (launchOptions == null) {
+                                                return;
+                                              }
+
+                                              final containerId = await widget
+                                                  .client
+                                                  .containers
+                                                  .run(
+                                                    command: "sleep infinity",
+                                                    image: _displayImageRef(
+                                                      img,
+                                                    ),
+                                                    writableRootFs: true,
+                                                    mounts:
+                                                        launchOptions.mounts,
+                                                  );
+
+                                              final tty = widget
+                                                  .client
+                                                  .containers
+                                                  .exec(
+                                                    containerId: containerId,
+                                                    tty: true,
+                                                    command:
+                                                        launchOptions.command,
+                                                  );
+
+                                              if (!mounted) return;
+
+                                              widget.onRun(tty);
+
+                                              ShadToaster.of(context).show(
+                                                const ShadToast(
+                                                  description: Text(
+                                                    'Starting container',
+                                                  ),
+                                                ),
+                                              );
+                                              _reload();
+                                            } catch (e) {
+                                              ShadToaster.of(context).show(
+                                                ShadToast(
+                                                  description: Text(
+                                                    'Unable to start container: $e',
+                                                  ),
+                                                ),
+                                              );
+                                            }
+                                          },
+                                  ),
+                          ),
+                          DataCell(_ellipsisText(_displayImageRef(img))),
+                          DataCell(Text(_formatImageTimeAgo(img.updatedAt))),
+                          DataCell(
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _tableIconButton(
+                                  icon: LucideIcons.info,
+                                  tooltip: 'Inspect',
+                                  onPressed: _isDeletingImages
+                                      ? null
+                                      : () {
+                                          showShadSheet(
+                                            side: ShadSheetSide.right,
+                                            context: context,
+                                            builder: (context) {
+                                              final sheetWidth =
+                                                  MediaQuery.sizeOf(
+                                                    context,
+                                                  ).width *
+                                                  0.94;
+                                              return ShadSheet(
+                                                title: Text(
+                                                  _displayImageRef(img),
+                                                ),
+                                                constraints: BoxConstraints(
+                                                  minWidth: sheetWidth,
+                                                  maxWidth: sheetWidth,
+                                                ),
+                                                child: _ImageDetailsSheet(
+                                                  client: widget.client,
+                                                  imageId: img.id,
+                                                ),
+                                              );
+                                            },
+                                          );
+                                        },
+                                ),
+                                _tableIconButton(
+                                  icon: LucideIcons.delete,
+                                  tooltip: 'Delete',
+                                  onPressed: _isDeletingImages
+                                      ? null
+                                      : () => _deleteImages([img]),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    }(),
                 ],
               ),
             ),
