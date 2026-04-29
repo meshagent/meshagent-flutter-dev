@@ -59,6 +59,71 @@ class RoomTerminal extends StatefulWidget {
   State createState() => _RoomTerminal();
 }
 
+class MeshagentTerminalView extends StatelessWidget {
+  const MeshagentTerminalView({
+    super.key,
+    required this.terminal,
+    this.muted = false,
+    this.showCursor = true,
+    this.padding = const EdgeInsets.all(16),
+  });
+
+  final Terminal terminal;
+  final bool muted;
+  final bool showCursor;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return TerminalView(
+      terminal,
+      theme: _terminalTheme(showCursor: showCursor),
+      textStyle: TerminalStyle(
+        fontFamily: GoogleFonts.sourceCodePro(
+          fontWeight: FontWeight.w500,
+          color: muted
+              ? ShadTheme.of(context).colorScheme.foreground.withAlpha(200)
+              : ShadTheme.of(context).colorScheme.foreground,
+        ).fontFamily!,
+        fontSize: 15,
+      ),
+      padding: padding,
+    );
+  }
+
+  TerminalTheme _terminalTheme({required bool showCursor}) {
+    const theme = TerminalThemes.defaultTheme;
+    if (showCursor) {
+      return theme;
+    }
+    return TerminalTheme(
+      cursor: Colors.transparent,
+      selection: theme.selection,
+      foreground: theme.foreground,
+      background: theme.background,
+      black: theme.black,
+      red: theme.red,
+      green: theme.green,
+      yellow: theme.yellow,
+      blue: theme.blue,
+      magenta: theme.magenta,
+      cyan: theme.cyan,
+      white: theme.white,
+      brightBlack: theme.brightBlack,
+      brightRed: theme.brightRed,
+      brightGreen: theme.brightGreen,
+      brightYellow: theme.brightYellow,
+      brightBlue: theme.brightBlue,
+      brightMagenta: theme.brightMagenta,
+      brightCyan: theme.brightCyan,
+      brightWhite: theme.brightWhite,
+      searchHitBackground: theme.searchHitBackground,
+      searchHitBackgroundCurrent: theme.searchHitBackgroundCurrent,
+      searchHitForeground: theme.searchHitForeground,
+    );
+  }
+}
+
 class _RoomTerminal extends State<RoomTerminal> {
   late final _ResizeForwarder _resizeForwarder;
 
@@ -166,16 +231,7 @@ class _RoomTerminal extends State<RoomTerminal> {
     }
     return LayoutBuilder(
       builder: (context, constraints) {
-        return TerminalView(
-          terminal,
-          textStyle: TerminalStyle(
-            fontFamily: GoogleFonts.sourceCodePro(
-              fontWeight: FontWeight.w500,
-            ).fontFamily!,
-            fontSize: 15,
-          ),
-          padding: EdgeInsets.all(16),
-        );
+        return MeshagentTerminalView(terminal: terminal);
       },
     );
   }
@@ -296,19 +352,7 @@ class _ContainerTerminal extends State<ContainerTerminal> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        return TerminalView(
-          terminal,
-          textStyle: TerminalStyle(
-            fontFamily: GoogleFonts.sourceCodePro(
-              fontWeight: FontWeight.w500,
-              color: closed
-                  ? ShadTheme.of(context).colorScheme.foreground.withAlpha(200)
-                  : ShadTheme.of(context).colorScheme.foreground,
-            ).fontFamily!,
-            fontSize: 15,
-          ),
-          padding: EdgeInsets.all(16),
-        );
+        return MeshagentTerminalView(terminal: terminal, muted: closed);
       },
     );
   }
