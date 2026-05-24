@@ -1490,7 +1490,7 @@ class _ContainerTableState extends State<ContainerTable> {
                         _fixedTextColumn('Status', 100),
                         _fixedTextColumn('Name', 140),
                         _flexTextColumn('Image'),
-                        _fixedTextColumn('Ports', 100),
+                        _fixedTextColumn('Ports', 200),
                         _fixedTextColumn('Started by', 100),
                         _actionsColumn(),
                       ],
