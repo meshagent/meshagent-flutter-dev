@@ -465,6 +465,7 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                           image: widget.shellImage,
                           command: "sleep infinity",
                           mounts: launchOptions.mounts,
+                          template: "agent",
                           writableRootFs: true,
                           env: {
                             "OPENAI_API_KEY": roomToken,

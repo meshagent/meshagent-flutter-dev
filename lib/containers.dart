@@ -1560,7 +1560,14 @@ class _ContainerTableState extends State<ContainerTable> {
                               DataCell(_ellipsisText(c.image)),
                               DataCell(
                                 _ellipsisText(
-                                  c.ports.isEmpty ? '' : c.ports.join(', '),
+                                  c.ports.isEmpty
+                                      ? ''
+                                      : c.ports
+                                            .map(
+                                              (p) =>
+                                                  '${p.containerPort} -> ${p.hostPort}',
+                                            )
+                                            .join(', '),
                                 ),
                               ),
                               DataCell(_ellipsisText(c.startedBy.name)),
