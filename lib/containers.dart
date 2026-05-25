@@ -1382,6 +1382,46 @@ class _ImageDescriptorTable extends StatelessWidget {
 }
 
 /// Pass your existing ContainersClient instance.
+String _formatContainerState(RoomContainer container) {
+  final exitCode = container.exitStatus?.exitCode;
+  if (container.state == 'EXITED' && exitCode != null) {
+    return 'EXITED ($exitCode)';
+  }
+  return container.state;
+}
+
+String _formatContainerBytes(int? bytes) {
+  if (bytes == null) {
+    return '—';
+  }
+  const units = ['B', 'KiB', 'MiB', 'GiB'];
+  var value = bytes.toDouble();
+  var unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value = value / 1024;
+    unitIndex += 1;
+  }
+  final precision = unitIndex == 0 || value >= 10 ? 0 : 1;
+  return '${value.toStringAsFixed(precision)} ${units[unitIndex]}';
+}
+
+String _formatContainerCpu(int? nanoCores) {
+  if (nanoCores == null) {
+    return '—';
+  }
+  final cores = nanoCores / 1000000000;
+  return '${cores.toStringAsFixed(2)} cores';
+}
+
+String _formatContainerPorts(RoomContainer container) {
+  if (container.ports.isEmpty) {
+    return '';
+  }
+  return container.ports
+      .map((p) => '${p.containerPort} -> ${p.hostPort}')
+      .join(', ');
+}
+
 class ContainerTable extends StatefulWidget {
   const ContainerTable({super.key, required this.client, required this.onRun});
 
@@ -1487,7 +1527,7 @@ class _ContainerTableState extends State<ContainerTable> {
                   : _developerDataTable(
                       columns: (_) => [
                         _iconColumn(),
-                        _fixedTextColumn('Status', 100),
+                        _fixedTextColumn('Status', 120),
                         _fixedTextColumn('Name', 140),
                         _flexTextColumn('Image'),
                         _fixedTextColumn('Ports', 200),
@@ -1540,7 +1580,7 @@ class _ContainerTableState extends State<ContainerTable> {
                                   },
                                 ),
                               ),
-                              DataCell(_ellipsisText(c.state)),
+                              DataCell(_ellipsisText(_formatContainerState(c))),
                               DataCell(
                                 Row(
                                   spacing: 8,
@@ -1558,18 +1598,7 @@ class _ContainerTableState extends State<ContainerTable> {
                                 ),
                               ),
                               DataCell(_ellipsisText(c.image)),
-                              DataCell(
-                                _ellipsisText(
-                                  c.ports.isEmpty
-                                      ? ''
-                                      : c.ports
-                                            .map(
-                                              (p) =>
-                                                  '${p.containerPort} -> ${p.hostPort}',
-                                            )
-                                            .join(', '),
-                                ),
-                              ),
+                              DataCell(_ellipsisText(_formatContainerPorts(c))),
                               DataCell(_ellipsisText(c.startedBy.name)),
                               DataCell(
                                 Row(
@@ -1593,6 +1622,7 @@ class _ContainerTableState extends State<ContainerTable> {
                                             child: ContainerLogs(
                                               client: widget.client,
                                               containerId: c.id,
+                                              initialContainer: c,
                                             ),
                                           ),
                                         );
@@ -3098,35 +3128,184 @@ class ContainerLogs extends StatefulWidget {
     super.key,
     required this.client,
     required this.containerId,
+    this.initialContainer,
   });
 
   final RoomClient client;
   final String containerId;
+  final RoomContainer? initialContainer;
   @override
   State<ContainerLogs> createState() => _ContainerLogsState();
 }
 
 class _ContainerLogsState extends State<ContainerLogs> {
+  RoomContainer? _container;
+  Object? _detailsError;
+  Timer? _refreshTimer;
+
   @override
   void initState() {
     super.initState();
+    _container = widget.initialContainer;
     logs = widget.client.containers.logs(
       containerId: widget.containerId,
       follow: true,
     );
+    _refreshContainerDetails();
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _refreshContainerDetails(),
+    );
+  }
+
+  Future<void> _refreshContainerDetails() async {
+    try {
+      final containers = await widget.client.containers.list(all: true);
+      RoomContainer? nextContainer;
+      for (final container in containers) {
+        if (container.id == widget.containerId) {
+          nextContainer = container;
+          break;
+        }
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _container = nextContainer ?? _container;
+        _detailsError = null;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _detailsError = error;
+      });
+    }
   }
 
   @override
   void dispose() {
-    super.dispose();
+    _refreshTimer?.cancel();
     logs.cancel();
+    super.dispose();
   }
 
   late final LogStream logs;
 
   @override
   Widget build(BuildContext context) {
-    return ContainerLogStream(logs: logs);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _ContainerDetailsPanel(container: _container, error: _detailsError),
+        const SizedBox(height: 12),
+        Expanded(child: ContainerLogStream(logs: logs)),
+      ],
+    );
+  }
+}
+
+class _ContainerDetailsPanel extends StatelessWidget {
+  const _ContainerDetailsPanel({required this.container, required this.error});
+
+  final RoomContainer? container;
+  final Object? error;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    final current = container;
+    if (current == null) {
+      return Text(
+        error == null
+            ? 'Loading container details'
+            : 'Unable to refresh container details: $error',
+        style: theme.textTheme.muted,
+      );
+    }
+
+    final exitStatus = current.exitStatus;
+    final stats = current.stats;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.colorScheme.border),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Wrap(
+          spacing: 16,
+          runSpacing: 10,
+          children: [
+            _ContainerDetail(
+              label: 'State',
+              value: _formatContainerState(current),
+            ),
+            _ContainerDetail(
+              label: 'Exit code',
+              value: exitStatus?.exitCode.toString() ?? '—',
+            ),
+            _ContainerDetail(label: 'Reason', value: exitStatus?.reason ?? '—'),
+            _ContainerDetail(
+              label: 'OOM killed',
+              value: exitStatus?.oomKilled == null
+                  ? '—'
+                  : exitStatus!.oomKilled!
+                  ? 'yes'
+                  : 'no',
+            ),
+            _ContainerDetail(
+              label: 'CPU',
+              value: _formatContainerCpu(stats?.cpuUsageNanoCores),
+            ),
+            _ContainerDetail(
+              label: 'Memory',
+              value: _formatContainerBytes(stats?.memoryWorkingSetBytes),
+            ),
+            _ContainerDetail(
+              label: 'Memory usage',
+              value: _formatContainerBytes(stats?.memoryUsageBytes),
+            ),
+            _ContainerDetail(
+              label: 'Ports',
+              value: _formatContainerPorts(current),
+            ),
+            if (exitStatus?.message?.isNotEmpty == true)
+              _ContainerDetail(label: 'Message', value: exitStatus!.message!),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContainerDetail extends StatelessWidget {
+  const _ContainerDetail({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 120, maxWidth: 320),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: theme.textTheme.muted.copyWith(fontSize: 12)),
+          const SizedBox(height: 2),
+          Text(
+            value.isEmpty ? '—' : value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
   }
 }
 
