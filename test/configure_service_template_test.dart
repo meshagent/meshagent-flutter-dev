@@ -7,6 +7,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 Widget _buildHarness({
   required ServiceTemplateSpec spec,
   Map<String, String>? prefilledVars,
+  List<String> routeDomains = const [],
   required void Function(Map<String, String> vars) onVars,
 }) {
   return ShadApp(
@@ -15,6 +16,7 @@ Widget _buildHarness({
         child: ConfigureServiceTemplate(
           spec: spec,
           prefilledVars: prefilledVars,
+          routeDomains: routeDomains,
           actionsBuilder: (context, vars, validate) {
             onVars(Map<String, String>.from(vars));
             return const [SizedBox.shrink()];
@@ -72,5 +74,30 @@ void main() {
     expect(seenVars, isNotNull);
     expect(seenVars!['provider'], 'OpenAI');
     expect(seenVars!['heartbeat'], 'on');
+  });
+
+  testWidgets('route template variables with a domain layout on desktop', (
+    tester,
+  ) async {
+    Map<String, String>? seenVars;
+    final routeSpec = ServiceTemplateSpec.fromJson({
+      'version': 'v1',
+      'kind': 'ServiceTemplate',
+      'metadata': {'name': 'assistant'},
+      'variables': [
+        {'name': 'route', 'type': 'route'},
+      ],
+    });
+
+    await tester.pumpWidget(
+      _buildHarness(
+        spec: routeSpec,
+        routeDomains: const ['agents.example.com'],
+        onVars: (vars) => seenVars = vars,
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(seenVars, isNotNull);
   });
 }

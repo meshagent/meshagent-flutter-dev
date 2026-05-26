@@ -2522,8 +2522,6 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
     }
 
     Widget wrapCompactMobileField(Widget child) {
-      child = SizedBox(width: double.infinity, child: child);
-
       if (!usesCompactMobileLayout) {
         return child;
       }
@@ -2532,13 +2530,11 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
         padding: const EdgeInsets.symmetric(
           vertical: _flowDialogCompactMobileFieldInset,
         ),
-        child: child,
+        child: SizedBox(width: double.infinity, child: child),
       );
     }
 
     Widget wrapCompactMobileSelectField(Widget child) {
-      child = SizedBox(width: double.infinity, child: child);
-
       if (!usesCompactMobileLayout) {
         return child;
       }
@@ -2547,7 +2543,7 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
         padding: const EdgeInsets.symmetric(
           vertical: _flowDialogCompactMobileSelectInset,
         ),
-        child: child,
+        child: SizedBox(width: double.infinity, child: child),
       );
     }
 
@@ -2732,44 +2728,46 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
                                   ),
                                 )
                               else
-                                wrapCompactMobileField(
-                                  ShadInputFormField(
-                                    onPressedOutside: dismissFocusedField,
-                                    contextMenuBuilder:
-                                        _adaptiveInputContextMenuBuilder,
-                                    groupId: "${v.name}_subdomain",
-                                    constraints: null,
-                                    padding: compactMobileInputPadding,
-                                    gap: 0,
-                                    id: "${v.name}_subdomain",
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    label: Text(
-                                      '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
-                                      style: labelStyle,
-                                    ),
-                                    initialValue:
-                                        _routeSubdomains[v.name] ?? "",
-                                    validator: v.optional
-                                        ? null
-                                        : (txt) => (txt.trim().isEmpty)
-                                              ? '${_variableTitle(v)} is required'
-                                              : null,
-                                    onChanged: (txt) {
-                                      setState(() {
-                                        _routeSubdomains[v.name] = txt.trim();
-                                        _syncRouteValue(v.name);
-                                      });
-                                    },
-                                    trailing: Container(
-                                      color: theme.colorScheme.muted,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 8,
+                                Expanded(
+                                  child: wrapCompactMobileField(
+                                    ShadInputFormField(
+                                      onPressedOutside: dismissFocusedField,
+                                      contextMenuBuilder:
+                                          _adaptiveInputContextMenuBuilder,
+                                      groupId: "${v.name}_subdomain",
+                                      constraints: null,
+                                      padding: compactMobileInputPadding,
+                                      gap: 0,
+                                      id: "${v.name}_subdomain",
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      label: Text(
+                                        '${_variableTitle(v)} (${v.optional ? 'optional' : 'required'})',
+                                        style: labelStyle,
                                       ),
-                                      child: Text(
-                                        ".${routeDomains.first}",
-                                        style: suffixTextStyle,
+                                      initialValue:
+                                          _routeSubdomains[v.name] ?? "",
+                                      validator: v.optional
+                                          ? null
+                                          : (txt) => (txt.trim().isEmpty)
+                                                ? '${_variableTitle(v)} is required'
+                                                : null,
+                                      onChanged: (txt) {
+                                        setState(() {
+                                          _routeSubdomains[v.name] = txt.trim();
+                                          _syncRouteValue(v.name);
+                                        });
+                                      },
+                                      trailing: Container(
+                                        color: theme.colorScheme.muted,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 8,
+                                        ),
+                                        child: Text(
+                                          ".${routeDomains.first}",
+                                          style: suffixTextStyle,
+                                        ),
                                       ),
                                     ),
                                   ),
