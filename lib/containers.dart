@@ -2052,6 +2052,7 @@ class ConfigureServiceTemplateDialog extends StatelessWidget {
     this.customActions = const [],
     this.dialogTitle,
     this.dialogDescription,
+    this.meshagentMailDomain,
   });
 
   final ServiceTemplateSpec spec;
@@ -2061,6 +2062,7 @@ class ConfigureServiceTemplateDialog extends StatelessWidget {
   final List<Widget> customActions;
   final String? dialogTitle;
   final String? dialogDescription;
+  final String? meshagentMailDomain;
 
   final List<Widget> Function(
     BuildContext,
@@ -2088,6 +2090,7 @@ class ConfigureServiceTemplateDialog extends StatelessWidget {
           spec: spec,
           prefilledVars: prefilledVars,
           routeDomains: routeDomains,
+          meshagentMailDomain: meshagentMailDomain,
           customActions: customActions,
           header: [
             const SizedBox(height: 8),
@@ -2356,6 +2359,7 @@ class ConfigureServiceTemplate extends StatefulWidget {
     this.desktopSectionSpacing = 10,
     this.desktopHeaderBottomSpacing,
     this.onFormStateChanged,
+    this.meshagentMailDomain,
   });
 
   final ServiceTemplateSpec spec;
@@ -2367,6 +2371,7 @@ class ConfigureServiceTemplate extends StatefulWidget {
   final double desktopHorizontalPadding;
   final double desktopSectionSpacing;
   final double? desktopHeaderBottomSpacing;
+  final String? meshagentMailDomain;
   final void Function(Map<String, String> vars, bool Function() validate)?
   onFormStateChanged;
 
@@ -2514,8 +2519,10 @@ class _ConfigureServiceTemplateState extends State<ConfigureServiceTemplate> {
       color: theme.colorScheme.mutedForeground,
       fontSize: usesCompactMobileLayout ? 14 : null,
     );
-    final mailDomain = const String.fromEnvironment("MESHAGENT_MAIL_DOMAIN");
-    final emailSuffix = mailDomain.isEmpty ? "" : "@$mailDomain";
+    final mailDomain = widget.meshagentMailDomain?.trim();
+    final emailSuffix = mailDomain == null || mailDomain.isEmpty
+        ? ""
+        : "@$mailDomain";
     final routeDomains = _routeDomains;
     void dismissFocusedField(PointerDownEvent _) {
       FocusManager.instance.primaryFocus?.unfocus();
