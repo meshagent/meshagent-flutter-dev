@@ -95,4 +95,184 @@ void main() {
       expect(spans.toList(), hasLength(2));
     });
   });
+
+  group('LiveMetricAccumulator', () {
+    test('aggregates sum metrics from realtime OTLP exports', () {
+      final accumulator = LiveMetricAccumulator();
+
+      accumulator.addExport(
+        OtlpMetricExport.fromJson({
+          'resourceMetrics': [
+            {
+              'scopeMetrics': [
+                {
+                  'metrics': [
+                    {
+                      'name': 'tokens',
+                      'unit': 'input_tokens',
+                      'sum': {
+                        'dataPoints': [
+                          {
+                            'startTimeUnixNano': '1',
+                            'timeUnixNano': '2',
+                            'asInt': '7',
+                            'attributes': [
+                              {
+                                'key': 'provider',
+                                'value': {'stringValue': 'openai'},
+                              },
+                              {
+                                'key': 'model',
+                                'value': {'stringValue': 'gpt-test'},
+                              },
+                            ],
+                          },
+                          {
+                            'startTimeUnixNano': '1',
+                            'timeUnixNano': '3',
+                            'asInt': '5',
+                            'attributes': [
+                              {
+                                'key': 'provider',
+                                'value': {'stringValue': 'openai'},
+                              },
+                              {
+                                'key': 'model',
+                                'value': {'stringValue': 'gpt-test'},
+                              },
+                            ],
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+      );
+
+      final snapshot = accumulator.snapshots.single;
+      expect(snapshot.key, 'openai/gpt-test/tokens');
+      expect(snapshot.kind, LiveMetricKind.sum);
+      expect(snapshot.value, 12);
+    });
+
+    test('aggregates histogram metrics from realtime OTLP exports', () {
+      final accumulator = LiveMetricAccumulator();
+
+      accumulator.addExport(
+        OtlpMetricExport.fromJson({
+          'resourceMetrics': [
+            {
+              'scopeMetrics': [
+                {
+                  'metrics': [
+                    {
+                      'name': 'http.client.request.duration',
+                      'unit': 's',
+                      'histogram': {
+                        'aggregationTemporality':
+                            'AGGREGATION_TEMPORALITY_DELTA',
+                        'dataPoints': [
+                          {
+                            'startTimeUnixNano': '1',
+                            'timeUnixNano': '2',
+                            'count': '3',
+                            'sum': 0.21,
+                            'min': 0.02,
+                            'max': 0.13,
+                            'bucketCounts': ['1', '2', '0'],
+                            'explicitBounds': [0.05, 0.1],
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+      );
+
+      accumulator.addExport(
+        OtlpMetricExport.fromJson({
+          'resourceMetrics': [
+            {
+              'scopeMetrics': [
+                {
+                  'metrics': [
+                    {
+                      'name': 'http.client.request.duration',
+                      'unit': 's',
+                      'histogram': {
+                        'aggregationTemporality':
+                            'AGGREGATION_TEMPORALITY_DELTA',
+                        'dataPoints': [
+                          {
+                            'startTimeUnixNano': '1',
+                            'timeUnixNano': '3',
+                            'count': '2',
+                            'sum': 0.4,
+                            'min': 0.15,
+                            'max': 0.25,
+                            'bucketCounts': ['0', '0', '2'],
+                            'explicitBounds': [0.05, 0.1],
+                          },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        }),
+      );
+
+      final snapshot = accumulator.snapshots.single;
+      expect(snapshot.key, 'http.client.request.duration');
+      expect(snapshot.kind, LiveMetricKind.histogram);
+      expect(snapshot.count, 5);
+      expect(snapshot.sum, closeTo(0.61, 0.0001));
+      expect(snapshot.min, 0.02);
+      expect(snapshot.max, 0.25);
+      expect(snapshot.bucketCounts, [1, 2, 2]);
+      expect(snapshot.explicitBounds, [0.05, 0.1]);
+      expect(snapshot.average, closeTo(0.122, 0.0001));
+      expect(snapshot.estimateQuantile(0.50), 0.1);
+      expect(snapshot.estimateQuantile(0.95), 0.1);
+      expect(snapshot.format(), contains('count=5'));
+      expect(snapshot.format(), contains('buckets=[<=0.0500:1'));
+    });
+
+    test('aggregates histogram-shaped session metric API rows', () {
+      final accumulator = LiveMetricAccumulator();
+
+      expect(
+        accumulator.addSessionMetric({
+          'kind': 'histogram',
+          'metric_name': 'http.client.request.duration',
+          'metric_unit': 's',
+          'metric_attributes': {'http.request.method': 'GET'},
+          'count': 4,
+          'sum': 0.8,
+          'min': 0.1,
+          'max': 0.4,
+          'bucket_counts': [1, 3],
+          'explicit_bounds': [0.2],
+        }),
+        isTrue,
+      );
+
+      final snapshot = accumulator.snapshots.single;
+      expect(snapshot.kind, LiveMetricKind.histogram);
+      expect(snapshot.count, 4);
+      expect(snapshot.sum, 0.8);
+      expect(snapshot.bucketCounts, [1, 3]);
+      expect(snapshot.explicitBounds, [0.2]);
+    });
+  });
 }

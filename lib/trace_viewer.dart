@@ -904,6 +904,341 @@ class _LiveLogViewer extends State<LiveLogViewer> {
   }
 }
 
+enum LiveMetricKind { sum, histogram }
+
+class LiveMetricSnapshot {
+  const LiveMetricSnapshot({
+    required this.key,
+    required this.unit,
+    required this.kind,
+    this.value,
+    this.count,
+    this.sum,
+    this.min,
+    this.max,
+    this.bucketCounts = const [],
+    this.explicitBounds = const [],
+  });
+
+  final String key;
+  final String unit;
+  final LiveMetricKind kind;
+  final num? value;
+  final int? count;
+  final num? sum;
+  final num? min;
+  final num? max;
+  final List<int> bucketCounts;
+  final List<num> explicitBounds;
+
+  num? get average {
+    final count = this.count;
+    final sum = this.sum;
+    if (count == null || count == 0 || sum == null) {
+      return null;
+    }
+    return sum / count;
+  }
+
+  num? estimateQuantile(double quantile) {
+    final count = this.count;
+    if (count == null || count <= 0 || bucketCounts.isEmpty) {
+      return null;
+    }
+
+    final target = count * quantile;
+    var running = 0;
+    for (var index = 0; index < bucketCounts.length; index += 1) {
+      running += bucketCounts[index];
+      if (running < target) {
+        continue;
+      }
+
+      if (index < explicitBounds.length) {
+        return explicitBounds[index];
+      }
+      return explicitBounds.isEmpty ? max : explicitBounds.last;
+    }
+
+    return max;
+  }
+
+  String format({Map<String, dynamic>? pricing}) {
+    return switch (kind) {
+      LiveMetricKind.sum =>
+        "$key = ${_formatMetricNumber(value ?? 0)} $unit${_priceSuffix(pricing, key, value ?? 0)}",
+      LiveMetricKind.histogram =>
+        "$key count=${count ?? 0} avg=${_formatOptionalMetricNumber(average)} $unit "
+            "min=${_formatOptionalMetricNumber(min)} max=${_formatOptionalMetricNumber(max)} "
+            "p50=${_formatOptionalMetricNumber(estimateQuantile(0.50))} "
+            "p95=${_formatOptionalMetricNumber(estimateQuantile(0.95))} "
+            "buckets=${_formatBuckets(bucketCounts, explicitBounds)}",
+    };
+  }
+}
+
+class LiveMetricAccumulator {
+  final Map<String, _LiveMetricEntry> _entries = {};
+
+  List<LiveMetricSnapshot> get snapshots {
+    final snapshots = _entries.values.map((entry) => entry.snapshot()).toList();
+    snapshots.sort((left, right) => left.key.compareTo(right.key));
+    return snapshots;
+  }
+
+  void clear() {
+    _entries.clear();
+  }
+
+  bool addExport(OtlpMetricExport export) {
+    var dirty = false;
+    for (final rm in export.resourceMetrics) {
+      for (final sm in rm.scopeMetrics) {
+        for (final metric in sm.metrics) {
+          dirty = _addMetric(metric) || dirty;
+        }
+      }
+    }
+    return dirty;
+  }
+
+  bool addSessionMetric(Map<String, dynamic> metric) {
+    final metricName = metric['metric_name']?.toString() ?? "";
+    if (metricName.isEmpty) {
+      return false;
+    }
+
+    final unit = metric['metric_unit']?.toString() ?? "";
+    final attributes = _stringMap(metric['metric_attributes']);
+    final key = _metricKeyFromMap(metricName, attributes);
+    final kind = metric['kind']?.toString() ?? "sum";
+
+    if (kind == "histogram") {
+      final entry = _entries.putIfAbsent(
+        key,
+        () => _LiveMetricEntry.histogram(key: key, unit: unit),
+      );
+      entry.addHistogramFields(
+        count: _parseMetricInt(metric['count']) ?? 0,
+        sum: _parseMetricNum(metric['sum']),
+        min: _parseMetricNum(metric['min']),
+        max: _parseMetricNum(metric['max']),
+        bucketCounts: (metric['bucket_counts'] as List<dynamic>? ?? [])
+            .map((value) => _parseMetricInt(value) ?? 0)
+            .toList(),
+        explicitBounds: (metric['explicit_bounds'] as List<dynamic>? ?? [])
+            .map((value) => _parseMetricNum(value) ?? 0)
+            .toList(),
+      );
+      return true;
+    }
+
+    final value = _parseMetricNum(metric['value']);
+    if (value == null) {
+      return false;
+    }
+    final entry = _entries.putIfAbsent(
+      key,
+      () => _LiveMetricEntry.sum(key: key, unit: unit),
+    );
+    entry.addNumber(value);
+    return true;
+  }
+
+  bool _addMetric(Metric metric) {
+    var dirty = false;
+    final unit = metric.unit ?? "";
+
+    for (final dp in metric.sum?.dataPoints ?? <NumberDataPoint>[]) {
+      final key = _metricKey(metric.name, dp.attributes);
+      final entry = _entries.putIfAbsent(
+        key,
+        () => _LiveMetricEntry.sum(key: key, unit: unit),
+      );
+      entry.addNumber(dp.value);
+      dirty = true;
+    }
+
+    for (final dp in metric.gauge?.dataPoints ?? <NumberDataPoint>[]) {
+      final key = _metricKey(metric.name, dp.attributes);
+      final entry = _entries.putIfAbsent(
+        key,
+        () => _LiveMetricEntry.sum(key: key, unit: unit),
+      );
+      entry.addNumber(dp.value);
+      dirty = true;
+    }
+
+    for (final dp in metric.histogram?.dataPoints ?? <HistogramDataPoint>[]) {
+      final key = _metricKey(metric.name, dp.attributes);
+      final entry = _entries.putIfAbsent(
+        key,
+        () => _LiveMetricEntry.histogram(key: key, unit: unit),
+      );
+      entry.addHistogram(dp);
+      dirty = true;
+    }
+
+    return dirty;
+  }
+}
+
+class _LiveMetricEntry {
+  _LiveMetricEntry.sum({required this.key, required this.unit})
+    : kind = LiveMetricKind.sum;
+
+  _LiveMetricEntry.histogram({required this.key, required this.unit})
+    : kind = LiveMetricKind.histogram;
+
+  final String key;
+  String unit;
+  final LiveMetricKind kind;
+  num value = 0;
+  int count = 0;
+  num sum = 0;
+  num? min;
+  num? max;
+  List<int> bucketCounts = const [];
+  List<num> explicitBounds = const [];
+
+  void addNumber(num value) {
+    this.value += value;
+  }
+
+  void addHistogram(HistogramDataPoint dataPoint) {
+    addHistogramFields(
+      count: dataPoint.count,
+      sum: dataPoint.sum,
+      min: dataPoint.min,
+      max: dataPoint.max,
+      bucketCounts: dataPoint.bucketCounts,
+      explicitBounds: dataPoint.explicitBounds,
+    );
+  }
+
+  void addHistogramFields({
+    required int count,
+    required num? sum,
+    required num? min,
+    required num? max,
+    required List<int> bucketCounts,
+    required List<num> explicitBounds,
+  }) {
+    this.count += count;
+    this.sum += sum ?? 0;
+    this.min = _minNullable(this.min, min);
+    this.max = _maxNullable(this.max, max);
+
+    if (explicitBounds.isNotEmpty) {
+      this.explicitBounds = List<num>.of(explicitBounds);
+    }
+
+    if (this.bucketCounts.length != bucketCounts.length) {
+      this.bucketCounts = List<int>.filled(bucketCounts.length, 0);
+    }
+    for (var index = 0; index < bucketCounts.length; index += 1) {
+      this.bucketCounts[index] += bucketCounts[index];
+    }
+  }
+
+  LiveMetricSnapshot snapshot() => LiveMetricSnapshot(
+    key: key,
+    unit: unit,
+    kind: kind,
+    value: kind == LiveMetricKind.sum ? value : null,
+    count: kind == LiveMetricKind.histogram ? count : null,
+    sum: kind == LiveMetricKind.histogram ? sum : null,
+    min: kind == LiveMetricKind.histogram ? min : null,
+    max: kind == LiveMetricKind.histogram ? max : null,
+    bucketCounts: kind == LiveMetricKind.histogram
+        ? List<int>.unmodifiable(bucketCounts)
+        : const [],
+    explicitBounds: kind == LiveMetricKind.histogram
+        ? List<num>.unmodifiable(explicitBounds)
+        : const [],
+  );
+}
+
+String _metricKey(String metricName, List<Attribute> attributes) {
+  final values = <String, String>{};
+  for (final attr in attributes) {
+    values[attr.key] = attr.value?.toString() ?? "";
+  }
+  return _metricKeyFromMap(metricName, values);
+}
+
+String _metricKeyFromMap(String metricName, Map<String, String> attributes) {
+  final provider = attributes["provider"];
+  final model = attributes["model"];
+  if (model != null && provider != null) {
+    return "$provider/$model/$metricName";
+  }
+  return metricName;
+}
+
+Map<String, String> _stringMap(dynamic value) {
+  if (value is! Map) {
+    return const {};
+  }
+  return value.map(
+    (key, value) => MapEntry(key.toString(), value?.toString() ?? ""),
+  );
+}
+
+num? _minNullable(num? left, num? right) {
+  if (left == null) return right;
+  if (right == null) return left;
+  return min(left, right);
+}
+
+num? _maxNullable(num? left, num? right) {
+  if (left == null) return right;
+  if (right == null) return left;
+  return max(left, right);
+}
+
+String _formatMetricNumber(num value) {
+  if (value is int) {
+    return value.toString();
+  }
+  return value.toStringAsFixed(value.abs() >= 10 ? 2 : 4);
+}
+
+String _formatOptionalMetricNumber(num? value) {
+  return value == null ? "n/a" : _formatMetricNumber(value);
+}
+
+String _formatBuckets(List<int> bucketCounts, List<num> explicitBounds) {
+  if (bucketCounts.isEmpty) {
+    return "[]";
+  }
+
+  final parts = <String>[];
+  for (var index = 0; index < bucketCounts.length; index += 1) {
+    final label = index < explicitBounds.length
+        ? "<=${_formatMetricNumber(explicitBounds[index])}"
+        : ">${explicitBounds.isEmpty ? "inf" : _formatMetricNumber(explicitBounds.last)}";
+    parts.add("$label:${bucketCounts[index]}");
+  }
+  return "[${parts.join(", ")}]";
+}
+
+String _priceSuffix(Map<String, dynamic>? data, String key, num value) {
+  final parts = key.split("/");
+  if (parts.length == 3) {
+    final provider = parts[0];
+    final model = parts[1];
+    final unit = parts[2];
+
+    final price = data?[provider]?[model]?[unit] as num?;
+
+    if (price != null) {
+      return " = \$${(value * price).toStringAsFixed(5)}";
+    }
+  }
+  return "";
+}
+
 class LiveMetricsViewer extends StatefulWidget {
   const LiveMetricsViewer({super.key, required this.events, this.pricing});
 
@@ -915,9 +1250,7 @@ class LiveMetricsViewer extends StatefulWidget {
 }
 
 class _LiveMetricsViewer extends State<LiveMetricsViewer> {
-  final List<ScopeMetrics> metrics = [];
-  final Map<String, num?> values = {};
-  final Map<String, String> labels = {};
+  final LiveMetricAccumulator metrics = LiveMetricAccumulator();
   int _processedEventCount = 0;
 
   @override
@@ -947,8 +1280,6 @@ class _LiveMetricsViewer extends State<LiveMetricsViewer> {
 
   void _rebuildMetrics() {
     metrics.clear();
-    values.clear();
-    labels.clear();
     _processedEventCount = 0;
     _processPendingEvents();
   }
@@ -972,49 +1303,7 @@ class _LiveMetricsViewer extends State<LiveMetricsViewer> {
     }
 
     final export = OtlpMetricExport.fromJson(event.data);
-    var dirty = false;
-    for (final rm in export.resourceMetrics) {
-      for (final sm in rm.scopeMetrics) {
-        metrics.add(sm);
-        for (final metric in sm.metrics) {
-          var name = metric.name;
-          String? model;
-          String? provider;
-          for (final dp in metric.sum?.dataPoints ?? <NumberDataPoint>[]) {
-            for (final attr in dp.attributes) {
-              if (attr.key == "model") {
-                model = attr.value;
-              } else if (attr.key == "provider") {
-                provider = attr.value;
-              }
-            }
-            if (model != null && provider != null) {
-              name = "$provider/$model/$name";
-            }
-            labels[name] = metric.unit ?? "";
-            values[name] = dp.value + (values[name] ?? 0);
-            dirty = true;
-          }
-        }
-      }
-    }
-    return dirty;
-  }
-
-  String getPrice(Map<String, dynamic>? data, String key, num value) {
-    final parts = key.split("/");
-    if (parts.length == 3) {
-      final provider = parts[0];
-      final model = parts[1];
-      final unit = parts[2];
-
-      final price = data?[provider]?[model]?[unit] as num?;
-
-      if (price != null) {
-        return " = \$${(value * price).toStringAsFixed(5)}";
-      }
-    }
-    return "";
+    return metrics.addExport(export);
   }
 
   @override
@@ -1031,11 +1320,8 @@ class _LiveMetricsViewer extends State<LiveMetricsViewer> {
                 height: 1.5,
               ),
               children: [
-                for (final k in values.keys.toList()..sort())
-                  TextSpan(
-                    text:
-                        "$k = ${values[k]} ${labels[k]}${getPrice(widget.pricing ?? const {}, k, values[k]!)}\n",
-                  ),
+                for (final metric in metrics.snapshots)
+                  TextSpan(text: "${metric.format(pricing: widget.pricing)}\n"),
               ],
             ),
           ),
@@ -1748,6 +2034,86 @@ class Gauge {
   };
 }
 
+class HistogramDataPoint {
+  HistogramDataPoint({
+    required this.startTimeUnixNano,
+    required this.timeUnixNano,
+    required this.count,
+    this.sum,
+    this.min,
+    this.max,
+    this.bucketCounts = const [],
+    this.explicitBounds = const [],
+    this.attributes = const [],
+  });
+
+  final int startTimeUnixNano;
+  final int timeUnixNano;
+  final int count;
+  final num? sum;
+  final num? min;
+  final num? max;
+  final List<int> bucketCounts;
+  final List<num> explicitBounds;
+  final List<Attribute> attributes;
+
+  factory HistogramDataPoint.fromJson(Map<String, dynamic> j) =>
+      HistogramDataPoint(
+        startTimeUnixNano: _parseMetricInt(j['startTimeUnixNano']) ?? 0,
+        timeUnixNano: _parseMetricInt(j['timeUnixNano']) ?? 0,
+        count: _parseMetricInt(j['count']) ?? 0,
+        sum: _parseMetricNum(j['sum']),
+        min: _parseMetricNum(j['min']),
+        max: _parseMetricNum(j['max']),
+        bucketCounts: (j['bucketCounts'] as List<dynamic>? ?? [])
+            .map((value) => _parseMetricInt(value) ?? 0)
+            .toList(),
+        explicitBounds: (j['explicitBounds'] as List<dynamic>? ?? [])
+            .map((value) => _parseMetricNum(value) ?? 0)
+            .toList(),
+        attributes: (j['attributes'] as List<dynamic>? ?? [])
+            .cast<Map<String, dynamic>>()
+            .map(Attribute.fromJson)
+            .toList(),
+      );
+
+  Map<String, dynamic> toJson() => {
+    'startTimeUnixNano': startTimeUnixNano,
+    'timeUnixNano': timeUnixNano,
+    'count': count,
+    if (sum != null) 'sum': sum,
+    if (min != null) 'min': min,
+    if (max != null) 'max': max,
+    if (bucketCounts.isNotEmpty) 'bucketCounts': bucketCounts,
+    if (explicitBounds.isNotEmpty) 'explicitBounds': explicitBounds,
+    if (attributes.isNotEmpty)
+      'attributes': attributes.map((a) => a.toJson()).toList(),
+  };
+}
+
+class Histogram {
+  Histogram({
+    required this.dataPoints,
+    this.aggregationTemporality = AggregationTemporality.unspecified,
+  });
+
+  final List<HistogramDataPoint> dataPoints;
+  final AggregationTemporality aggregationTemporality;
+
+  factory Histogram.fromJson(Map<String, dynamic> j) => Histogram(
+    dataPoints: (j['dataPoints'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(HistogramDataPoint.fromJson)
+        .toList(),
+    aggregationTemporality: _aggFromJson(j['aggregationTemporality']),
+  );
+
+  Map<String, dynamic> toJson() => {
+    'dataPoints': dataPoints.map((p) => p.toJson()).toList(),
+    'aggregationTemporality': _aggToJson(aggregationTemporality),
+  };
+}
+
 /// Generic Metric wrapper – only one of [sum], [gauge] etc. is populated.
 class Metric {
   Metric({
@@ -1756,7 +2122,8 @@ class Metric {
     this.description,
     this.sum,
     this.gauge,
-    // extend later: histogram, exponentialHistogram, summary …
+    this.histogram,
+    // extend later: exponentialHistogram, summary …
   });
 
   final String name;
@@ -1764,6 +2131,7 @@ class Metric {
   final String? description;
   final Sum? sum;
   final Gauge? gauge;
+  final Histogram? histogram;
 
   // Returns the most-recent datapoint (max timeUnixNano).
   num? latestValueOf() {
@@ -1790,6 +2158,9 @@ class Metric {
     description: j['description'],
     sum: j['sum'] != null ? Sum.fromJson(j['sum']) : null,
     gauge: j['gauge'] != null ? Gauge.fromJson(j['gauge']) : null,
+    histogram: j['histogram'] != null
+        ? Histogram.fromJson(j['histogram'])
+        : null,
   );
 
   Map<String, dynamic> toJson() => {
@@ -1798,7 +2169,23 @@ class Metric {
     if (description != null) 'description': description,
     if (sum != null) 'sum': sum!.toJson(),
     if (gauge != null) 'gauge': gauge!.toJson(),
+    if (histogram != null) 'histogram': histogram!.toJson(),
   };
+}
+
+num? _parseMetricNum(dynamic value) {
+  if (value is num) {
+    return value;
+  }
+  if (value is String) {
+    return num.tryParse(value);
+  }
+  return null;
+}
+
+int? _parseMetricInt(dynamic value) {
+  final parsed = _parseMetricNum(value);
+  return parsed?.toInt();
 }
 
 /* ───────── Wrapper layers (ScopeMetrics, ResourceMetrics, Export) ───────── */
