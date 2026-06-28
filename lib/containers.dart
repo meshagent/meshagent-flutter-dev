@@ -2004,26 +2004,18 @@ class _ServiceTableState extends State<ServiceTable> {
                             ),
                             _tableIconButton(
                               icon: LucideIcons.logs,
-                              tooltip: 'Logs',
-                              onPressed: containerId == null
+                              tooltip: 'Events',
+                              onPressed: serviceId == null
                                   ? null
                                   : () {
                                       showShadDialog(
                                         context: context,
-                                        builder: (context) => ShadDialog(
-                                          scrollable: false,
-                                          constraints: BoxConstraints(
-                                            minWidth: 1024,
-                                            minHeight: 600,
-                                            maxHeight: 700,
-                                            maxWidth: 1024,
-                                          ),
-                                          title: Text('Service logs'),
-                                          child: ContainerLogs(
-                                            client: widget.client,
-                                            containerId: containerId,
-                                          ),
-                                        ),
+                                        builder: (context) =>
+                                            _ServiceEventsDialog(
+                                              client: widget.client,
+                                              service: service,
+                                              initialState: state,
+                                            ),
                                       );
                                     },
                             ),
@@ -2037,6 +2029,247 @@ class _ServiceTableState extends State<ServiceTable> {
           },
         );
       },
+    );
+  }
+}
+
+class _ServiceEventsDialog extends StatefulWidget {
+  const _ServiceEventsDialog({
+    required this.client,
+    required this.service,
+    required this.initialState,
+  });
+
+  final RoomClient client;
+  final ServiceSpec service;
+  final ServiceRuntimeState? initialState;
+
+  @override
+  State<_ServiceEventsDialog> createState() => _ServiceEventsDialogState();
+}
+
+class _ServiceEventsDialogState extends State<_ServiceEventsDialog> {
+  Timer? _refreshTimer;
+  ServiceRuntimeState? _state;
+  Object? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _state = widget.initialState;
+    _refresh();
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 2),
+      (_) => _refresh(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    final serviceId = widget.service.id;
+    if (serviceId == null) {
+      setState(() {
+        _loading = false;
+        _error = null;
+      });
+      return;
+    }
+
+    try {
+      final result = await widget.client.services.listWithState();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _state = result.serviceStates[serviceId];
+        _error = null;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = error;
+        _loading = false;
+      });
+    }
+  }
+
+  String _formatTimestamp(DateTime? value) {
+    if (value == null) {
+      return "—";
+    }
+    return value.toIso8601String();
+  }
+
+  void _showContainerLogs(String containerId) {
+    showShadDialog(
+      context: context,
+      builder: (context) => ShadDialog(
+        scrollable: false,
+        constraints: const BoxConstraints(
+          minWidth: 1024,
+          minHeight: 600,
+          maxHeight: 700,
+          maxWidth: 1024,
+        ),
+        title: const Text('Container logs'),
+        child: ContainerLogs(client: widget.client, containerId: containerId),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    final state = _state;
+    final containerId = state?.containerId;
+    final events = state?.events ?? const <ServiceRuntimeEvent>[];
+
+    return ShadDialog(
+      scrollable: false,
+      constraints: const BoxConstraints(
+        minWidth: 920,
+        minHeight: 560,
+        maxHeight: 680,
+        maxWidth: 920,
+      ),
+      title: Text('${widget.service.metadata.name} events'),
+      description: Text(widget.service.id ?? 'Service has not been saved'),
+      actions: [
+        if (containerId != null)
+          ShadButton.secondary(
+            leading: const Icon(LucideIcons.logs, size: 16),
+            onPressed: () => _showContainerLogs(containerId),
+            child: const Text('Container Logs'),
+          ),
+      ],
+      child: SizedBox(
+        width: 880,
+        height: 500,
+        child: _error != null
+            ? Center(child: Text('Unable to load service events: $_error'))
+            : _loading && state == null
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ShadBadge(child: Text(state?.state ?? 'unknown')),
+                      ShadBadge.secondary(
+                        child: Text('restarts ${state?.restartCount ?? 0}'),
+                      ),
+                      if (state?.lastExitCode != null)
+                        ShadBadge.destructive(
+                          child: Text('exit ${state!.lastExitCode}'),
+                        ),
+                      if (state?.restartScheduledAtTime != null)
+                        ShadBadge.secondary(
+                          child: Text(
+                            'restart ${_formatTimestamp(state!.restartScheduledAtTime)}',
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (state?.lastStartError?.isNotEmpty == true) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      state!.lastStartError!,
+                      style: TextStyle(color: theme.colorScheme.destructive),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: events.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No service lifecycle events recorded.',
+                              style: theme.textTheme.muted,
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: events.length,
+                            separatorBuilder: (_, _) =>
+                                const Divider(height: 1),
+                            itemBuilder: (context, index) {
+                              final event = events[index];
+                              final warning =
+                                  event.type.toLowerCase() == 'warning';
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      warning
+                                          ? LucideIcons.triangleAlert
+                                          : LucideIcons.circleCheck,
+                                      size: 18,
+                                      color: warning
+                                          ? theme.colorScheme.destructive
+                                          : null,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 4,
+                                            crossAxisAlignment:
+                                                WrapCrossAlignment.center,
+                                            children: [
+                                              Text(
+                                                event.reason,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                              Text(
+                                                event.type,
+                                                style: theme.textTheme.muted,
+                                              ),
+                                              if (event.count > 1)
+                                                ShadBadge.secondary(
+                                                  child: Text(
+                                                    'x${event.count}',
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          SelectableText(event.message),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '${_formatTimestamp(event.firstTimestampTime)} - ${_formatTimestamp(event.lastTimestampTime)}',
+                                            style: theme.textTheme.muted,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+      ),
     );
   }
 }
