@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:meshagent/meshagent.dart';
 import 'package:meshagent_flutter_shadcn/ui/ui.dart';
@@ -2109,6 +2110,25 @@ class _ServiceEventsDialogState extends State<_ServiceEventsDialog> {
     return value.toIso8601String();
   }
 
+  Future<void> _copyText(String text, {required String label}) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) {
+      return;
+    }
+    ShadToaster.of(context).show(ShadToast(description: Text('$label copied')));
+  }
+
+  String _formatEventForCopy(ServiceRuntimeEvent event) {
+    return [
+      'reason: ${event.reason}',
+      'type: ${event.type}',
+      'count: ${event.count}',
+      'first timestamp: ${_formatTimestamp(event.firstTimestampTime)}',
+      'last timestamp: ${_formatTimestamp(event.lastTimestampTime)}',
+      'message: ${event.message}',
+    ].join('\n');
+  }
+
   void _showContainerLogs(String containerId) {
     showShadDialog(
       context: context,
@@ -2183,9 +2203,33 @@ class _ServiceEventsDialogState extends State<_ServiceEventsDialog> {
                   ),
                   if (state?.lastStartError?.isNotEmpty == true) ...[
                     const SizedBox(height: 12),
-                    Text(
-                      state!.lastStartError!,
-                      style: TextStyle(color: theme.colorScheme.destructive),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Tooltip(
+                            message: state!.lastStartError!,
+                            waitDuration: const Duration(milliseconds: 500),
+                            child: Text(
+                              state.lastStartError!,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: theme.colorScheme.destructive,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ShadButton.secondary(
+                          leading: const Icon(LucideIcons.copy, size: 16),
+                          onPressed: () => _copyText(
+                            state.lastStartError!,
+                            label: 'Startup error',
+                          ),
+                          child: const Text('Copy'),
+                        ),
+                      ],
                     ),
                   ],
                   const SizedBox(height: 16),
@@ -2252,7 +2296,38 @@ class _ServiceEventsDialogState extends State<_ServiceEventsDialog> {
                                             ],
                                           ),
                                           const SizedBox(height: 4),
-                                          SelectableText(event.message),
+                                          Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Expanded(
+                                                child: Tooltip(
+                                                  message: event.message,
+                                                  waitDuration: const Duration(
+                                                    milliseconds: 500,
+                                                  ),
+                                                  child: Text(
+                                                    event.message,
+                                                    maxLines: 3,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              ShadButton.secondary(
+                                                leading: const Icon(
+                                                  LucideIcons.copy,
+                                                  size: 16,
+                                                ),
+                                                onPressed: () => _copyText(
+                                                  _formatEventForCopy(event),
+                                                  label: 'Event',
+                                                ),
+                                                child: const Text('Copy'),
+                                              ),
+                                            ],
+                                          ),
                                           const SizedBox(height: 4),
                                           Text(
                                             '${_formatTimestamp(event.firstTimestampTime)} - ${_formatTimestamp(event.lastTimestampTime)}',
