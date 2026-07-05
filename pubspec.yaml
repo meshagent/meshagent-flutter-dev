@@ -40,7 +40,7 @@ dependencies:
   meshagent: ^0.45.7
   meshagent_flutter: ^0.45.7
   meshagent_flutter_shadcn: ^0.45.7
-  xterm: ^4.0.0
+  libghostty: ^0.0.10
   stream_transform: ^2.1.1
   flutter_solidart: ^2.7.1
   web_socket_channel: ^3.0.1
@@ -53,3 +53,7 @@ dev_dependencies:
     sdk: flutter
   integration_test:
     sdk: flutter
+
+flutter:
+  assets:
+    - assets/libghostty.wasm

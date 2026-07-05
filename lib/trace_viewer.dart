@@ -42,6 +42,17 @@ String formatTraceViewerTimestampFromUnixNano(int unixNano) {
   );
 }
 
+String formatTraceViewerDurationFromUnixNano({
+  required int startTimeUnixNano,
+  required int endTimeUnixNano,
+}) {
+  final durationNanos = max(0, endTimeUnixNano - startTimeUnixNano);
+  final milliseconds = durationNanos / 1000000;
+  var value = milliseconds.toStringAsFixed(3);
+  value = value.replaceFirst(RegExp(r'\.?0+$'), '');
+  return '$value ms';
+}
+
 class SpanCollection extends Iterable<Span> {
   SpanCollection();
 
@@ -125,7 +136,13 @@ class SpanCollection extends Iterable<Span> {
   }
 
   Iterable<Span> getRootSpans() {
-    return _rootSpans;
+    return _rootSpans.followedBy(
+      _spans.where(
+        (span) =>
+            span.parentSpanId != null &&
+            !_spansById.containsKey("${span.traceId}/${span.parentSpanId}"),
+      ),
+    );
   }
 
   Iterable<Span> getChildren(String parentSpanId) {
@@ -307,10 +324,10 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
   Widget build(BuildContext context) {
     final colorScheme = ShadTheme.of(context).colorScheme;
     final node = widget.node;
-    final duration =
-        ((node.endTimeUnixNano - node.startTimeUnixNano) / 1000000000).asFixed(
-          2,
-        );
+    final duration = formatTraceViewerDurationFromUnixNano(
+      startTimeUnixNano: node.startTimeUnixNano,
+      endTimeUnixNano: node.endTimeUnixNano,
+    );
 
     final totalDuration = widget.end - widget.start;
     final startPct =
@@ -422,10 +439,7 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
-                                          TextSpan(
-                                            text:
-                                                "${Duration(microseconds: ((node.endTimeUnixNano - node.startTimeUnixNano) / 1000).toInt()).inMilliseconds} ms",
-                                          ),
+                                          TextSpan(text: duration),
                                         ],
                                       ),
                                     ),
@@ -466,9 +480,7 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
                           );
                         },
                         child: Text(
-                          duration == 0
-                              ? node.name
-                              : "${node.name} (${duration}s)",
+                          "${node.name} ($duration)",
                           maxLines: 1,
                           textAlign: TextAlign.start,
                           overflow: TextOverflow.ellipsis,
@@ -524,7 +536,7 @@ class _SpanTreeNodeViewer extends State<SpanTreeNodeViewer> {
                                         Text(
                                           "Ended: ${formatTraceViewerTimestampFromUnixNano(node.endTimeUnixNano)}",
                                         ),
-                                        Text("Duration: ${duration}s"),
+                                        Text("Duration: $duration"),
                                       ],
                                     ),
                                   );

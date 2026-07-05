@@ -35,6 +35,49 @@ void main() {
     });
   });
 
+  group('duration formatting', () {
+    test('uses milliseconds with up to three decimal places', () {
+      expect(
+        formatTraceViewerDurationFromUnixNano(
+          startTimeUnixNano: 0,
+          endTimeUnixNano: 17338,
+        ),
+        '0.017 ms',
+      );
+      expect(
+        formatTraceViewerDurationFromUnixNano(
+          startTimeUnixNano: 0,
+          endTimeUnixNano: 280060,
+        ),
+        '0.28 ms',
+      );
+      expect(
+        formatTraceViewerDurationFromUnixNano(
+          startTimeUnixNano: 0,
+          endTimeUnixNano: 1000000,
+        ),
+        '1 ms',
+      );
+      expect(
+        formatTraceViewerDurationFromUnixNano(
+          startTimeUnixNano: 0,
+          endTimeUnixNano: 1156421334,
+        ),
+        '1156.421 ms',
+      );
+    });
+
+    test('clamps negative durations to zero', () {
+      expect(
+        formatTraceViewerDurationFromUnixNano(
+          startTimeUnixNano: 20,
+          endTimeUnixNano: 10,
+        ),
+        '0 ms',
+      );
+    });
+  });
+
   group('SpanCollection', () {
     test('dedupes identical spans by trace and span id', () {
       final spans = SpanCollection();
@@ -93,6 +136,35 @@ void main() {
       expect(children, hasLength(1));
       expect(children.single.endTimeUnixNano, 60);
       expect(spans.toList(), hasLength(2));
+    });
+
+    test('shows spans with missing parents as roots', () {
+      final spans = SpanCollection();
+      final child = _span(
+        traceId: 'trace-1',
+        spanId: 'child',
+        parentSpanId: 'missing-parent',
+      );
+
+      spans.add(child);
+
+      expect(spans.getRootSpans().toList(), [child]);
+    });
+
+    test('stops showing orphan child as root when parent arrives', () {
+      final spans = SpanCollection();
+      final parent = _span(traceId: 'trace-1', spanId: 'parent');
+      final child = _span(
+        traceId: 'trace-1',
+        spanId: 'child',
+        parentSpanId: 'parent',
+      );
+
+      spans.add(child);
+      spans.add(parent);
+
+      expect(spans.getRootSpans().toList(), [parent]);
+      expect(spans.getChildren('parent').toList(), [child]);
     });
   });
 
