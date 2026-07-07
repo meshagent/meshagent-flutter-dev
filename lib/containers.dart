@@ -1801,7 +1801,7 @@ class _ServiceTableState extends State<ServiceTable> {
   }
 
   late final servicesResource = Resource<ListServicesResult>(
-    () => widget.client.services.listWithState(),
+    () => widget.client.services.list(),
   );
 
   String _formatTimestamp(DateTime? value) {
@@ -2083,7 +2083,7 @@ class _ServiceEventsDialogState extends State<_ServiceEventsDialog> {
     }
 
     try {
-      final result = await widget.client.services.listWithState();
+      final result = await widget.client.services.list();
       if (!mounted) {
         return;
       }
