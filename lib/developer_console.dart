@@ -133,7 +133,7 @@ class RoomDeveloperConsole extends StatefulWidget {
     required this.events,
     required this.room,
     required this.pricing,
-    required this.shellImage,
+    this.shellImage = "meshagent/cli:default",
   });
 
   final String shellImage;
