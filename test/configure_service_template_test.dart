@@ -39,7 +39,7 @@ void main() {
       },
       {
         'name': 'heartbeat',
-        'enum': ['on', 'off'],
+        'enum': ['off', 'on'],
       },
     ],
   });
@@ -55,7 +55,7 @@ void main() {
 
     expect(seenVars, isNotNull);
     expect(seenVars!['provider'], 'OpenAI');
-    expect(seenVars!['heartbeat'], 'on');
+    expect(seenVars!['heartbeat'], 'off');
   });
 
   testWidgets('invalid prefilled enum values are normalized before submit', (
@@ -73,7 +73,7 @@ void main() {
 
     expect(seenVars, isNotNull);
     expect(seenVars!['provider'], 'OpenAI');
-    expect(seenVars!['heartbeat'], 'on');
+    expect(seenVars!['heartbeat'], 'off');
   });
 
   testWidgets('route template variables with a domain layout on desktop', (
