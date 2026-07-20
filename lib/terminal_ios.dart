@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:meshagent/meshagent.dart';
 
+// iOS builds use this lightweight terminal instead of flterm because flterm
+// embeds ghostty.framework, whose binary is rejected by App Store Connect.
 Future<void> initializeMeshagentTerminalRuntime({Uri? wasmUri}) async {}
 
 class RoomTerminal extends StatelessWidget {
