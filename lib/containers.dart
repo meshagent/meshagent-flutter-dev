@@ -275,15 +275,18 @@ Future<TerminalLaunchOptions?> promptForImageTerminal(
   BuildContext context, {
   String initialCommand = "/bin/bash -il",
   List<RoomStorageMountSpec> initialRoomMounts = const [],
+  List<VolumeStorageMountSpec> initialVolumeMounts = const [],
   List<ImageStorageMountSpec> initialImageMounts = const [],
 }) async {
   return showShadDialog<TerminalLaunchOptions>(
     context: context,
     builder: (context) => _TerminalLaunchDialog(
       allowRoomMounts: true,
+      allowVolumeMounts: true,
       allowImageMounts: true,
       initialCommand: initialCommand,
       initialRoomMounts: initialRoomMounts,
+      initialVolumeMounts: initialVolumeMounts,
       initialImageMounts: initialImageMounts,
     ),
   );
@@ -325,19 +328,45 @@ class _EditableImageMount {
   }
 }
 
+class _EditableVolumeMount {
+  _EditableVolumeMount({
+    String name = "",
+    String path = "",
+    String subpath = "",
+    this.readOnly = false,
+  }) : nameController = TextEditingController(text: name),
+       pathController = TextEditingController(text: path),
+       subpathController = TextEditingController(text: subpath);
+
+  final TextEditingController nameController;
+  final TextEditingController pathController;
+  final TextEditingController subpathController;
+  bool readOnly;
+
+  void dispose() {
+    nameController.dispose();
+    pathController.dispose();
+    subpathController.dispose();
+  }
+}
+
 class _TerminalLaunchDialog extends StatefulWidget {
   const _TerminalLaunchDialog({
     this.allowRoomMounts = false,
+    this.allowVolumeMounts = false,
     this.allowImageMounts = false,
     this.initialCommand = "/bin/bash -il",
     this.initialRoomMounts = const [],
+    this.initialVolumeMounts = const [],
     this.initialImageMounts = const [],
   });
 
   final bool allowRoomMounts;
+  final bool allowVolumeMounts;
   final bool allowImageMounts;
   final String initialCommand;
   final List<RoomStorageMountSpec> initialRoomMounts;
+  final List<VolumeStorageMountSpec> initialVolumeMounts;
   final List<ImageStorageMountSpec> initialImageMounts;
 
   @override
@@ -347,6 +376,7 @@ class _TerminalLaunchDialog extends StatefulWidget {
 class _TerminalLaunchDialogState extends State<_TerminalLaunchDialog> {
   late final TextEditingController _commandController;
   late final List<_EditableRoomMount> _roomMounts;
+  late final List<_EditableVolumeMount> _volumeMounts;
   late final List<_EditableImageMount> _imageMounts;
   String? _validationError;
 
@@ -360,6 +390,15 @@ class _TerminalLaunchDialogState extends State<_TerminalLaunchDialog> {
           path: mount.path,
           subpath: mount.subpath ?? "",
           readOnly: mount.readOnly ?? false,
+        ),
+    ];
+    _volumeMounts = [
+      for (final mount in widget.initialVolumeMounts)
+        _EditableVolumeMount(
+          name: mount.name,
+          path: mount.path,
+          subpath: mount.subpath ?? "",
+          readOnly: mount.readOnly,
         ),
     ];
     _imageMounts = [
@@ -376,6 +415,9 @@ class _TerminalLaunchDialogState extends State<_TerminalLaunchDialog> {
   void dispose() {
     _commandController.dispose();
     for (final mount in _roomMounts) {
+      mount.dispose();
+    }
+    for (final mount in _volumeMounts) {
       mount.dispose();
     }
     for (final mount in _imageMounts) {
@@ -425,10 +467,37 @@ class _TerminalLaunchDialogState extends State<_TerminalLaunchDialog> {
       );
     }
 
+    final volumeMounts = <VolumeStorageMountSpec>[];
+    for (final mount in _volumeMounts) {
+      final name = mount.nameController.text.trim();
+      final path = mount.pathController.text.trim();
+      final subpath = mount.subpathController.text.trim();
+      if (name.isEmpty && path.isEmpty && subpath.isEmpty) {
+        continue;
+      }
+      if (name.isEmpty || path.isEmpty) {
+        _validationError =
+            "Volume mounts require both a volume name and a container path.";
+        return null;
+      }
+      volumeMounts.add(
+        VolumeStorageMountSpec(
+          name: name,
+          path: path,
+          subpath: subpath.isEmpty ? null : subpath,
+          readOnly: mount.readOnly,
+        ),
+      );
+    }
+
     _validationError = null;
-    final hasMounts = roomMounts.isNotEmpty || imageMounts.isNotEmpty;
+    final hasMounts =
+        roomMounts.isNotEmpty ||
+        volumeMounts.isNotEmpty ||
+        imageMounts.isNotEmpty;
     final mounts = ContainerMountSpec(
       room: roomMounts.isEmpty ? null : roomMounts,
+      volumes: volumeMounts.isEmpty ? null : volumeMounts,
       images: imageMounts.isEmpty ? null : imageMounts,
     );
     return TerminalLaunchOptions(
@@ -549,6 +618,37 @@ class _TerminalLaunchDialogState extends State<_TerminalLaunchDialog> {
                           onRemove: () {
                             setState(() {
                               _imageMounts.remove(mount);
+                              mount.dispose();
+                            });
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              if (widget.allowVolumeMounts) ...[
+                const SizedBox(height: 20),
+                _mountSection(
+                  title: "Volume Mounts",
+                  description:
+                      "Attach a named room volume for the lifetime of the launched container.",
+                  onAdd: () {
+                    setState(() {
+                      _volumeMounts.add(_EditableVolumeMount());
+                    });
+                  },
+                  addLabel: "Add volume mount",
+                  children: [
+                    for (final mount in _volumeMounts)
+                      Padding(
+                        key: ObjectKey(mount),
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _VolumeMountEditor(
+                          mount: mount,
+                          onChanged: () => setState(() {}),
+                          onRemove: () {
+                            setState(() {
+                              _volumeMounts.remove(mount);
                               mount.dispose();
                             });
                           },
@@ -687,6 +787,73 @@ class _ImageMountEditor extends StatelessWidget {
               description: const Text(
                 "Mount path inside the launched container.",
               ),
+            ),
+            const SizedBox(height: 12),
+            ShadCheckboxFormField(
+              initialValue: mount.readOnly,
+              onChanged: (value) {
+                mount.readOnly = value;
+                onChanged();
+              },
+              inputLabel: const Text("Read only"),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ShadButton.outline(
+                onPressed: onRemove,
+                leading: const Icon(Icons.delete_outline),
+                child: const Text("Remove"),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VolumeMountEditor extends StatelessWidget {
+  const _VolumeMountEditor({
+    required this.mount,
+    required this.onChanged,
+    required this.onRemove,
+  });
+
+  final _EditableVolumeMount mount;
+  final VoidCallback onChanged;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ShadInputFormField(
+              controller: mount.nameController,
+              label: const Text("Volume name"),
+              description: const Text("Durable room volume to attach."),
+            ),
+            const SizedBox(height: 12),
+            ShadInputFormField(
+              controller: mount.pathController,
+              label: const Text("Path"),
+              description: const Text(
+                "Mount path inside the launched container.",
+              ),
+            ),
+            const SizedBox(height: 12),
+            ShadInputFormField(
+              controller: mount.subpathController,
+              label: const Text("Subpath"),
+              description: const Text("Optional subpath within the volume."),
             ),
             const SizedBox(height: 12),
             ShadCheckboxFormField(
@@ -3585,6 +3752,14 @@ class _ContainerDetailsPanel extends StatelessWidget {
               label: 'Ports',
               value: _formatContainerPorts(current),
             ),
+            for (final mount
+                in current.mounts?.volumes ?? const <VolumeStorageMountSpec>[])
+              _ContainerDetail(
+                label: 'Volume ${mount.name}',
+                value:
+                    '${mount.path}${mount.subpath == null || mount.subpath!.isEmpty ? '' : ' · subpath ${mount.subpath}'}'
+                    ' · ${mount.readOnly ? 'read only' : 'read/write'}',
+              ),
             if (exitStatus?.message?.isNotEmpty == true)
               _ContainerDetail(label: 'Message', value: exitStatus!.message!),
           ],
