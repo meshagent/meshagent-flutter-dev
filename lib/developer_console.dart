@@ -469,6 +469,9 @@ class _RoomDeveloperConsoleState extends State<RoomDeveloperConsole> {
                           writableRootFs: true,
                           env: {
                             "OPENAI_API_KEY": roomToken,
+                            "ANTHROPIC_API_KEY": roomToken,
+                            "GROK_API_KEY": roomToken,
+                            "XAI_API_KEY": roomToken,
                             "MESHAGENT_TOKEN": roomToken,
                           },
                           private: true,
