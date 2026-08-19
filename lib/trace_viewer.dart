@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
@@ -864,7 +863,8 @@ class _LiveLogViewer extends State<LiveLogViewer> {
                   Expanded(
                     child: Builder(
                       builder: (context) {
-                        final baseStyle = GoogleFonts.sourceCodePro(
+                        final baseStyle = TextStyle(
+                          fontFamily: 'monospace',
                           color: switch (m.severity) {
                             Severity.warn => Colors.orange,
                             Severity.warn2 => Colors.orange,
@@ -1327,7 +1327,8 @@ class _LiveMetricsViewer extends State<LiveMetricsViewer> {
           padding: const EdgeInsets.all(20.0), // Adjust padding as needed
           child: SelectableText.rich(
             TextSpan(
-              style: GoogleFonts.sourceCodePro(
+              style: TextStyle(
+                fontFamily: 'monospace',
                 color: ShadTheme.of(context).colorScheme.foreground,
                 height: 1.5,
               ),

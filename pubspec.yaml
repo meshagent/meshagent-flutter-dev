@@ -35,7 +35,6 @@ dependencies:
     sdk: flutter
   shadcn_ui: ^0.54.0
   lucide_icons_flutter: ^3.1.1
-  google_fonts: ^6.2.1
   super_sliver_list: ^0.4.1
   meshagent: ^0.50.1
   meshagent_flutter: ^0.50.1

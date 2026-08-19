@@ -4,7 +4,6 @@ import 'dart:typed_data';
 
 import 'package:flterm/flterm.dart' as flterm;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:meshagent/meshagent.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -188,12 +187,11 @@ class _MeshagentTerminalViewState extends State<MeshagentTerminalView> {
   }
 
   Future<TextStyle> _loadTerminalTextStyle() async {
-    final textStyle = GoogleFonts.sourceCodePro(
+    return const TextStyle(
+      fontFamily: 'monospace',
       fontSize: _terminalFontSize,
       fontWeight: FontWeight.w500,
     );
-    await GoogleFonts.pendingFonts();
-    return textStyle;
   }
 
   Widget _buildTerminal({

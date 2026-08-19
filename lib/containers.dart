@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:meshagent/meshagent.dart';
 import 'package:meshagent_flutter_shadcn/ui/ui.dart';
 import './developer_console_layout.dart';
@@ -78,8 +77,8 @@ TextStyle _flowDialogContentTitleStyle(BuildContext context) {
   }
 
   final theme = ShadTheme.of(context);
-  return GoogleFonts.inter(
-    textStyle: DefaultTextStyle.of(context).style,
+  return DefaultTextStyle.of(context).style.copyWith(
+    fontFamily: 'Inter',
     color: theme.colorScheme.foreground,
     fontWeight: FontWeight.w600,
   );
@@ -87,7 +86,8 @@ TextStyle _flowDialogContentTitleStyle(BuildContext context) {
 
 TextStyle _flowDialogDesktopHeadingStyle(BuildContext context) {
   final theme = ShadTheme.of(context);
-  return GoogleFonts.inter(
+  return TextStyle(
+    fontFamily: 'Inter',
     color: theme.colorScheme.foreground,
     fontWeight: FontWeight.w600,
     fontSize: 15,
@@ -97,7 +97,8 @@ TextStyle _flowDialogDesktopHeadingStyle(BuildContext context) {
 
 TextStyle _flowDialogDesktopHelperStyle(BuildContext context) {
   final theme = ShadTheme.of(context);
-  return GoogleFonts.inter(
+  return TextStyle(
+    fontFamily: 'Inter',
     color: theme.colorScheme.mutedForeground,
     fontWeight: FontWeight.w400,
     fontSize: 14,
@@ -554,7 +555,8 @@ class _TerminalLaunchDialogState extends State<_TerminalLaunchDialog> {
                   "Enter an interactive terminal command to launch it in a terminal",
                 ),
                 textAlign: TextAlign.start,
-                style: GoogleFonts.sourceCodePro(
+                style: const TextStyle(
+                  fontFamily: 'monospace',
                   color: const Color.from(
                     alpha: 1,
                     red: .8,
@@ -3537,7 +3539,8 @@ class _ContainerLogStream extends State<ContainerLogStream> {
           (entry) => entry.value.current != null && entry.value.total != null,
         )
         .toList();
-    final baseStyle = GoogleFonts.sourceCodePro(
+    final baseStyle = TextStyle(
+      fontFamily: 'monospace',
       fontWeight: FontWeight.w500,
       fontSize: 12,
       color: ShadTheme.of(context).colorScheme.foreground,
