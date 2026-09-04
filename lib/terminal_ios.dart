@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:meshagent/meshagent.dart';
 
+import 'typography.dart';
+
 // iOS builds use this lightweight terminal instead of flterm because flterm
 // embeds ghostty.framework, whose binary is rejected by App Store Connect.
 Future<void> initializeMeshagentTerminalRuntime({Uri? wasmUri}) async {}
@@ -139,9 +141,8 @@ class _MeshagentTerminalViewState extends State<MeshagentTerminalView> {
     final foreground = widget.muted
         ? const Color(0xfff2f2f2).withAlpha(170)
         : const Color(0xfff2f2f2);
-    final textStyle = TextStyle(
+    final textStyle = meshagentDeveloperCodeTextStyle.copyWith(
       color: foreground,
-      fontFamily: "monospace",
       fontSize: 15,
       fontWeight: FontWeight.w500,
     );

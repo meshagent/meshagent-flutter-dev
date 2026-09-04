@@ -10,6 +10,7 @@ import 'package:meshagent/room_server_client.dart';
 import 'package:meshagent_flutter_shadcn/meshagent_flutter_shadcn.dart';
 
 import 'ansi.dart';
+import 'typography.dart';
 
 dynamic trimStrings(dynamic v) {
   if (v is String) {
@@ -863,21 +864,23 @@ class _LiveLogViewer extends State<LiveLogViewer> {
                   Expanded(
                     child: Builder(
                       builder: (context) {
-                        final baseStyle = TextStyle(
-                          fontFamily: 'monospace',
-                          color: switch (m.severity) {
-                            Severity.warn => Colors.orange,
-                            Severity.warn2 => Colors.orange,
-                            Severity.warn3 => Colors.orange,
-                            Severity.warn4 => Colors.orange,
-                            Severity.error => Colors.red,
-                            Severity.error2 => Colors.red,
-                            Severity.error3 => Colors.red,
-                            Severity.error4 => Colors.red,
-                            _ => ShadTheme.of(context).colorScheme.foreground,
-                          },
-                          height: 1.5,
-                        );
+                        final baseStyle = meshagentDeveloperCodeTextStyle
+                            .copyWith(
+                              color: switch (m.severity) {
+                                Severity.warn => Colors.orange,
+                                Severity.warn2 => Colors.orange,
+                                Severity.warn3 => Colors.orange,
+                                Severity.warn4 => Colors.orange,
+                                Severity.error => Colors.red,
+                                Severity.error2 => Colors.red,
+                                Severity.error3 => Colors.red,
+                                Severity.error4 => Colors.red,
+                                _ => ShadTheme.of(
+                                  context,
+                                ).colorScheme.foreground,
+                              },
+                              height: 1.5,
+                            );
                         if (query.isEmpty) {
                           return Text.rich(
                             ansiToTextSpan(m.body, baseStyle: baseStyle),
@@ -1327,8 +1330,7 @@ class _LiveMetricsViewer extends State<LiveMetricsViewer> {
           padding: const EdgeInsets.all(20.0), // Adjust padding as needed
           child: SelectableText.rich(
             TextSpan(
-              style: TextStyle(
-                fontFamily: 'monospace',
+              style: meshagentDeveloperCodeTextStyle.copyWith(
                 color: ShadTheme.of(context).colorScheme.foreground,
                 height: 1.5,
               ),

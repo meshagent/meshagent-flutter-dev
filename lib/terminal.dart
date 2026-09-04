@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:meshagent/meshagent.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import 'typography.dart';
+
 Future<void>? _terminalRuntimeInitialization;
 
 Future<void> initializeMeshagentTerminalRuntime({Uri? wasmUri}) {
@@ -187,8 +189,7 @@ class _MeshagentTerminalViewState extends State<MeshagentTerminalView> {
   }
 
   Future<TextStyle> _loadTerminalTextStyle() async {
-    return const TextStyle(
-      fontFamily: 'monospace',
+    return meshagentDeveloperCodeTextStyle.copyWith(
       fontSize: _terminalFontSize,
       fontWeight: FontWeight.w500,
     );
@@ -211,9 +212,8 @@ class _MeshagentTerminalViewState extends State<MeshagentTerminalView> {
         cursor: flterm.CursorTheme(
           opacity: widget.showCursor && widget.terminal.showCursor ? 1.0 : 0.0,
         ),
-        fontFamily: textStyle.fontFamily ?? "Source Code Pro",
-        fontFamilyFallback:
-            textStyle.fontFamilyFallback ?? const ["Source Code Pro"],
+        fontFamily: textStyle.fontFamily ?? meshagentDeveloperCodeFontFamily,
+        fontFamilyFallback: textStyle.fontFamilyFallback ?? const ['monospace'],
         fontSize: _terminalFontSize,
         fontWeight: textStyle.fontWeight ?? FontWeight.w500,
         selection: const flterm.SelectionTheme(

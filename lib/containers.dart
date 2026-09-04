@@ -5,8 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:meshagent/meshagent.dart';
 import 'package:meshagent_flutter_shadcn/ui/ui.dart';
+
 import './developer_console_layout.dart';
 import './ansi.dart';
+import './typography.dart';
 
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
@@ -555,8 +557,7 @@ class _TerminalLaunchDialogState extends State<_TerminalLaunchDialog> {
                   "Enter an interactive terminal command to launch it in a terminal",
                 ),
                 textAlign: TextAlign.start,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
+                style: meshagentDeveloperCodeTextStyle.copyWith(
                   color: const Color.from(
                     alpha: 1,
                     red: .8,
@@ -3539,8 +3540,7 @@ class _ContainerLogStream extends State<ContainerLogStream> {
           (entry) => entry.value.current != null && entry.value.total != null,
         )
         .toList();
-    final baseStyle = TextStyle(
-      fontFamily: 'monospace',
+    final baseStyle = meshagentDeveloperCodeTextStyle.copyWith(
       fontWeight: FontWeight.w500,
       fontSize: 12,
       color: ShadTheme.of(context).colorScheme.foreground,
